@@ -17,6 +17,7 @@ app.py —— Streamlit前端（Demo展示界面）
 import os
 import sys
 import json
+import time
 
 import streamlit as st
 
@@ -282,26 +283,97 @@ def load_text(path: str):
 # ---------------------------------------------------------------
 # 流水线执行（封装四Agent，带进度显示）
 # ---------------------------------------------------------------
-def run_pipeline(topic: str, target_count: int):
-    """执行 规划->检索->提取->审查->综合 完整流水线"""
+def run_pipeline(topic: str, target_count: int,
+                 retrieval_mode: str = "standard", mode_years: int = 2):
+    """
+    执行 规划->检索->提取->审查->综合 完整流水线
+
+    retrieval_mode:
+        "standard"        标准检索（规划Agent生成检索词，S2主源三段管线）
+        "mode1"/"mode2"/"mode3" 三模式检索作为检索阶段
+        （检索词规划与多库检索由模式检索承担，后续提取/审查/综合不变）
+    """
     from agents import planner, searcher, extractor, reviewer, synthesizer
     import llm_client
 
-    # ---- 1. 规划Agent ----
-    status = st.status("🧠 规划Agent: 分解研究主题...", expanded=True)
-    plan = planner.make_plan(topic)
-    st.session_state.run_outputs["plan"] = plan
-    status.update(label=f"🧠 规划Agent完成: {len(plan.keywords)}组检索词",
-                  state="complete")
+    # ---- 1+2. 检索阶段（标准 / 三模式 两条路径；
+    # 模式未命中先降级标准检索，降级后仍未命中才终止）----
+    _use_mode = retrieval_mode in ("mode1", "mode2", "mode3")
+    _mode_miss = False  # 模式检索未命中 → 已降级为标准检索
+    papers = []
+    if _use_mode:
+        from agents import mode_assistant
 
-    # ---- 2. 检索Agent ----
-    status = st.status("🔍 检索Agent: 检索文献中（arXiv限速,约需1-3分钟）...",
+        _mode_names = {"mode1": "🌱 入门综述", "mode2": "🚀 前沿突破",
+                       "mode3": "🔀 交叉领域"}
+        status = st.status(
+            f"🎯 {_mode_names[retrieval_mode]}模式检索: "
+            "规划检索词+多库检索中...", expanded=True)
+        papers = mode_assistant.retrieve_for_pipeline(
+            topic, retrieval_mode, mode_years, top_k=target_count)
+        if papers:
+            st.write(f"模式检索命中 {len(papers)} 篇（带PDF直链），"
+                     "开始下载PDF...")
+            status.update(
+                label=f"🎯 {_mode_names[retrieval_mode]}检索完成: "
+                      f"{len(papers)}篇候选", state="complete")
+        else:
+            # 用户要求: 模式检索未命中 → 先降级为标准检索继续
+            st.warning("🎯 模式检索未命中带PDF直链的文献，"
+                       "已自动切换为**标准检索**继续...")
+            status.update(label="⚠️ 模式检索未命中，已切换为标准检索",
+                          state="complete")
+            _use_mode = False
+            _mode_miss = True
+    if not _use_mode:
+        # ---- 1. 规划Agent（标准路径）----
+        status = st.status("🧠 规划Agent: 分解研究主题...", expanded=True)
+        plan = planner.make_plan(topic)
+        st.session_state.run_outputs["plan"] = plan
+        status.update(label=f"🧠 规划Agent完成: {len(plan.keywords)}组检索词",
+                      state="complete")
+
+    # ---- 2. 检索Agent: PDF下载（两条路径共用下载与筛选收尾）----
+    status = st.status("🔍 检索Agent: 下载论文PDF中（arXiv限速,约需1-3分钟）...",
                        expanded=True)
-    st.write("检索词: " + ", ".join(plan.keywords))
-    papers = searcher.run(plan, results_per_query=8, top_k=target_count)
+    if _use_mode:
+        # 模式路径: papers已落盘元数据，这里只补PDF下载（含arXiv救援）
+        papers = searcher.download(papers)
+        # 下载后重写元数据（剔除下载失败项，与searcher.run落盘口径一致，
+        # 后续extractor/reviewer只处理有本地PDF的论文）
+        if papers:
+            with open(os.path.join(config.DATA_DIR, "papers_meta.json"),
+                      "w", encoding="utf-8") as f:
+                json.dump([p.model_dump() for p in papers], f,
+                          ensure_ascii=False, indent=2)
+    else:
+        st.write("检索词: " + ", ".join(plan.keywords))
+        papers = searcher.run(plan, results_per_query=8, top_k=target_count)
     if len(papers) == 0:
-        status.update(label="❌ 检索失败: 没有获得可用论文", state="error")
+        # 用户要求: 模式检索降级标准检索后仍未命中 → 终止流水线
+        if _mode_miss:
+            st.error("❌ 模式检索未命中，流水线终止")
+            status.update(label="❌ 模式检索未命中，流水线终止",
+                          state="error")
+        else:
+            status.update(label="❌ 检索失败: 没有获得可用论文", state="error")
         st.stop()
+
+    # 模式检索附加（含降级标准检索后命中的情况）: 生成核心名词速查表
+    # （无上限），存入会话+落盘，供「论文原文」页旁随时对照查看
+    if _use_mode or _mode_miss:
+        try:
+            st.write("生成核心名词速查表（供论文原文页对照）...")
+            _g = mode_assistant.generate_glossary(papers, topic)
+            if _g:
+                st.session_state.glossary_md = _g
+                st.session_state.glossary_topic = topic
+                with open(os.path.join(config.DATA_DIR, "glossary_last.json"),
+                          "w", encoding="utf-8") as f:
+                    json.dump({"topic": topic, "md": _g}, f,
+                              ensure_ascii=False, indent=1)
+        except Exception as _g_err:
+            st.write(f"速查表生成失败(不影响流水线): {_g_err}")
     st.write(f"获得 {len(papers)} 篇论文, PDF已下载")
     status.update(label=f"🔍 检索Agent完成: {len(papers)}篇论文", state="complete")
 
@@ -379,6 +451,25 @@ with st.sidebar:
     )
     target_count = st.slider("目标论文数", 3, 15, 5)
 
+    # 检索方式: 标准流水线 / 三模式检索作为检索阶段（产出完整综述）
+    retrieval_mode_label = st.radio(
+        "检索方式",
+        ["📌 标准（推荐）", "🌱 入门综述模式", "🚀 前沿突破模式",
+         "🔀 交叉领域模式"],
+        help="标准=规划Agent生成检索词+四路信号综合排序；\n"
+             "三模式=模式化检索词规划+多库检索，检索结果同样进入"
+             "提取→审查→综合全流程，最终产出带核验的完整综述；"
+             "模式未命中自动改用标准检索，仍未命中才终止流水线",
+        key="retrieval_mode_radio",
+    )
+    _retrieval_mode = {"📌 标准（推荐）": "standard",
+                       "🌱 入门综述模式": "mode1",
+                       "🚀 前沿突破模式": "mode2",
+                       "🔀 交叉领域模式": "mode3"}[retrieval_mode_label]
+    mode_years_sidebar = 2
+    if _retrieval_mode == "mode2":
+        mode_years_sidebar = st.slider("前沿时间范围（近N年）", 1, 5, 2)
+
     col1, col2 = st.columns(2)
     with col1:
         # ★运行锁: 防止并发流水线（2026-09-04实测教训）
@@ -387,14 +478,15 @@ with st.sidebar:
         # OpenAlex触发429限流，速度反而暴慢。必须显式加锁。
         running = st.session_state.get("pipeline_running", False)
         if st.button("🚀 完整运行", type="primary", use_container_width=True,
-                     disabled=running,
-                     help="运行中请耐心等待，重复点击会触发API限流"):
-            st.session_state.pipeline_running = True
-            try:
-                with st.spinner("流水线运行中..."):
-                    run_pipeline(topic, target_count)
-            finally:
-                st.session_state.pipeline_running = False
+                         disabled=running,
+                         help="运行中请耐心等待，重复点击会触发API限流"):
+                st.session_state.pipeline_running = True
+                try:
+                    with st.spinner("流水线运行中..."):
+                        run_pipeline(topic, target_count,
+                                     _retrieval_mode, mode_years_sidebar)
+                finally:
+                    st.session_state.pipeline_running = False
         if running:
             st.info("⏳ 流水线正在执行中，请等待完成后再操作页面")
     with col2:
@@ -434,7 +526,12 @@ _result_topic = st.session_state.run_outputs.get("topic", "历史结果")
 st.title(f"📚 研究综述: {_result_topic}")
 
 if not st.session_state.pipeline_done:
-    st.info("👈 在侧边栏输入研究主题，点击「完整运行」或「载入已有结果」开始")
+    # 开始检索的页面: 检索一律通过侧边栏流水线发起（用户要求:
+    # 删去无需运行流水线的独立检索入口）
+    st.info("👋 欢迎！请在👈左侧边栏输入研究主题、选择检索方式"
+            "（📌标准 / 🌱入门综述 / 🚀前沿突破 / 🔀交叉领域），"
+            "点击「🚀 完整运行」开始检索并产出带核验的完整综述；"
+            "已有历史产出可点「📂 载入已有结果」直接查看。")
     st.stop()
 
 # 各标签页共用的数据加载
@@ -555,19 +652,21 @@ if reviews:
 # 高频标签平铺在第一层（结果消费动线: 找论文→读报告→问答→问AI）;
 # 低频标签收进「🗂 更多」里的第二层标签栏——老用户不受新手指南等
 # 低频入口干扰，但功能一个不少（Streamlit支持嵌套tabs，内容天然隔离）。
+# 检索一律由侧边栏流水线发起（用户要求: 无独立检索入口）。
 # 变量语义与初版完全一致，下方各 with tabX: 渲染代码零改动:
-#   tab0=检索结果 tab1=信息卡片 tab2=审查明细 tab3=可信问答
-#   tab4=学术争议 tab5=综述表格 tab6=引用图谱 tab7=最终报告
-#   tab8=论文原文 tab9=AI助手 tabG=新手指南
+#   tab0=检索结果 tab1=信息卡片 tab2=审查明细
+#   tab3=可信问答 tab4=学术争议 tab5=综述表格 tab6=引用图谱
+#   tab7=最终报告 tab8=论文原文 tab9=AI助手 tabG=新手指南
 # ================================================================
 tab0, tab7, tab3, tab9, tab_more = st.tabs(
-    ["🔍 检索结果", "📝 最终报告", "💬 可信问答", "🤖 AI助手", "🗂 更多"])
+    ["🔍 检索结果", "📝 最终报告", "💬 可信问答",
+     "🤖 AI助手", "🗂 更多"])
 
 with tab_more:
     st.caption("低频功能收纳于此，保持常用功能一触可达")
-    tab1, tab2, tab4, tab5, tab6, tab8, tabG = st.tabs(
+    tab1, tab2, tab4, tab5, tab6, tab8, tabC, tabG = st.tabs(
         ["📄 信息卡片", "✅ 审查明细", "⚡ 学术争议", "📊 综述表格",
-         "🕸 引用图谱", "📚 论文原文", "📖 新手指南"])
+         "🕸 引用图谱", "📚 论文原文", "⚔️ 对比阅读", "📖 新手指南"])
 
 # ---- 标签页: 新手指南（核心知识解释，面向所有使用者）----
 with tabG:
@@ -608,6 +707,13 @@ with tabG:
 4. **🤖 AI助手** — 任何疑问直接问：系统怎么用、指标什么含义、
    论文里某个方法的效果，它都能答（论文内容只基于已核验信息）。
 
+**🎯 三模式检索**（侧边栏「检索方式」选择，作为流水线的检索阶段运行）——
+🌱**入门综述**（经典综述优先，零基础也能懂）/
+🚀**前沿突破**（近1-5年顶刊顶会最新成果，按时间+影响力排序）/
+🔀**交叉领域**（S2+OpenAlex+arXiv多库互补，组合词精准定位跨学科研究）。
+检索命中的文献照常进入提取→审查→综合，产出带核验的完整综述；
+**模式未命中自动降级为标准检索**继续，降级后仍未命中才终止流水线。
+
 **第二层「🗂 更多」**（低频功能，点开后可见）:
 
 5. **📄 信息卡片** — 每篇论文被拆成了哪些知识点（声明）？
@@ -618,9 +724,15 @@ with tabG:
    🔴=正面对立，🟡=表面冲突（实验条件不同导致的）。
 8. **📊 综述表格** — 各论文的方法横向对比表。
 9. **🕸 引用图谱** — 论文之间谁引用谁的关系网（可拖拽交互）。
-10. ** 论文原文** — 想亲自读论文？选一篇就在网页里直接阅读PDF全文，
-   核对系统说的和论文写的是否一致。
-11. **📖 新手指南** — 就是本页。熟悉系统后不用再看，需要时来「更多」找。
+10. **📚 论文原文** — 想亲自读论文？选一篇就在网页里直接阅读PDF全文，
+    核对系统说的和论文写的是否一致。顶部还有 **🔍 全文搜索**
+    （一个关键词同时查所有本地论文，命中处高亮并可跳到对应页码）、
+    **📝 阅读笔记**（给某页写批注，绑定论文与页码，本地保存可增删改）、
+    **📖 核心名词速查对照**（阅读区右侧常驻最近模式检索报告的名词表，
+    随读随查，可一键隐藏）。
+11. **⚔️ 对比阅读** — 挑两篇论文左右并排对比：背景/方法/结论/争议点
+    一屏看清，还联动显示各自的阅读笔记。
+12. **📖 新手指南** — 就是本页。熟悉系统后不用再看，需要时来「更多」找。
 """)
 
     with st.expander("📚 术语速查表（看不懂某个词就来这里查）", expanded=False):
@@ -1029,17 +1141,56 @@ AI查语义曲解），每条关键信息理论上都可回溯到PDF原文。
             with st.expander("🍼 小白版报告（通俗解读）", expanded=True):
                 st.markdown(st.session_state.plain_report)
         st.markdown(report_md)
-        # 提供下载按钮
-        st.download_button(
-            "⬇️ 下载完整报告 (Markdown)",
-            data=report_md,
-            file_name="literature_review.md",
-            mime="text/markdown",
-        )
+        # 提供下载按钮（Markdown + 成员C模块1: Word/LaTeX双格式导出）
+        try:
+            import exporter
+            _papers_raw = load_json(
+                os.path.join(config.DATA_DIR, "papers_meta.json")) or []
+            _refs_meta = exporter.meta_from_papers_json(_papers_raw)
+            _topic_exp = st.session_state.run_outputs.get("topic", "文献综述")
+            _meta_lines = [f"主题: {_topic_exp}",
+                           f"收录论文: {len(_papers_raw)} 篇"]
+            _d1, _d2, _d3 = st.columns(3)
+            with _d1:
+                st.download_button(
+                    "⬇️ Markdown",
+                    data=report_md,
+                    file_name="literature_review.md",
+                    mime="text/markdown",
+                )
+            with _d2:
+                st.download_button(
+                    "⬇️ Word (.docx)",
+                    data=exporter.md_to_docx(
+                        report_md, title=f"研究综述: {_topic_exp}",
+                        meta_lines=_meta_lines),
+                    file_name="literature_review.docx",
+                    mime="application/vnd.openxmlformats-officedocument"
+                         ".wordprocessingml.document",
+                )
+            with _d3:
+                st.download_button(
+                    "⬇️ LaTeX+BibTeX (.zip)",
+                    data=exporter.build_latex_package(
+                        report_md, f"研究综述: {_topic_exp}",
+                        _refs_meta, _meta_lines),
+                    file_name="latex_package.zip",
+                    mime="application/zip",
+                    help="含 main.tex + refs.bib + README（编译说明），"
+                         "上传 Overleaf 选 XeLaTeX 即可编译",
+                )
+        except Exception as _exp_err:
+            st.caption(f"Word/LaTeX 导出不可用: {_exp_err}（Markdown下载不受影响）")
+            st.download_button(
+                "⬇️ 下载完整报告 (Markdown)",
+                data=report_md,
+                file_name="literature_review.md",
+                mime="text/markdown",
+            )
     else:
         st.warning("最终报告未生成")
 
-# ---- 标签8: 论文原文（本地PDF在线阅读）----
+# ---- 标签8: 论文原文（PDF搜索 + 本地PDF在线阅读）----
 with tab8:
     st.subheader("论文原文阅读")
     st.caption("流水线下载的PDF全文可在此逐页阅读。想核对系统声明的"
@@ -1052,6 +1203,84 @@ with tab8:
         st.info("papers/ 目录下没有PDF。请先完整运行一次流水线"
                 "（检索Agent会自动下载论文PDF到本地）。")
     else:
+        # =============================================================
+        # 成员C · 模块2: PDF全文搜索（增量索引 + 跨文档 + 高亮 + 跳页）
+        # =============================================================
+        with st.expander("🔍 PDF全文搜索（跨所有本地论文）", expanded=False):
+            try:
+                import pdf_search as _ps
+
+                _s_col, _s_btn = st.columns([4, 1])
+                with _s_col:
+                    _ps_q = st.text_input(
+                        "关键词（多词=同时出现，支持中英文）",
+                        key="ps_q",
+                        placeholder="如: surrogate gradient / 脉冲 训练")
+                with _s_btn:
+                    st.write("")  # 对齐输入框基线
+                    _go_search = st.button("🔍 搜索", use_container_width=True)
+
+                if _go_search and _ps_q.strip():
+                    # 增量构建索引（已索引且未变的PDF秒级跳过）
+                    with st.spinner("正在更新索引（首次较慢，之后秒开）..."):
+                        _idx = _ps.build_index()
+                    st.session_state.ps_results = _ps.search(
+                        _ps_q.strip(), _idx)
+                    st.session_state.ps_query = _ps_q.strip()
+
+                if st.session_state.get("ps_results") is not None:
+                    _hits = st.session_state.ps_results
+                    _pq = st.session_state.get("ps_query", "")
+                    if not _hits:
+                        st.info(f"没有找到与「{_pq}」匹配的内容")
+                    else:
+                        _docs = sorted({h['pdf_id'] for h in _hits})
+                        st.caption(f"命中 {len(_hits)} 页 · "
+                                   f"跨 {len(_docs)} 篇论文"
+                                   f"（按命中页数排序，点开展看高亮）")
+                        for _hi, _h in enumerate(_hits[:20]):
+                            _flag = "🟨" if _h["pdf_id"] == \
+                                st.session_state.get("pdf_jump_id") else ""
+                            with st.expander(
+                                f"{_flag}《{_h['title'][:52]}》"
+                                f"· 第{_h['page'] + 1}页 · "
+                                f"命中{_h['score']}页"
+                            ):
+                                st.markdown(f"**摘要片段**: {_h['snippet']}")
+                                _img = _ps.render_highlight_page(
+                                    _h["pdf_id"], _h["page"], _pq)
+                                if _img and os.path.exists(_img):
+                                    st.image(_img,
+                                             caption=f"第{_h['page'] + 1}页 · "
+                                                     f"黄色高亮=关键词",
+                                             use_container_width=True)
+                                _j1, _j2 = st.columns([1, 2])
+                                with _j1:
+                                    if st.button("📄 跳转原文页",
+                                                 key=f"ps_jump_{_hi}",
+                                                 use_container_width=True):
+                                        st.session_state.pdf_jump_id = \
+                                            _h["pdf_id"]
+                                        st.session_state.pdf_jump_page = \
+                                            _h["page"]
+                                        # 联动模块3: 摘要片段预填进笔记引用
+                                        st.session_state.note_prefill = \
+                                            _h["snippet"]
+                                        st.rerun()
+                                with _j2:
+                                    if st.button("📝 引用此段做笔记",
+                                                 key=f"ps_note_{_hi}",
+                                                 use_container_width=True):
+                                        st.session_state.pdf_jump_id = \
+                                            _h["pdf_id"]
+                                        st.session_state.pdf_jump_page = \
+                                            _h["page"]
+                                        st.session_state.note_prefill = \
+                                            _h["snippet"]
+                                        st.rerun()
+            except Exception as _ps_err:
+                st.caption(f"全文搜索暂不可用: {_ps_err}")
+
         # 用arxiv_id关联元数据
         meta_by_id = {p.arxiv_id: p for p in (papers or [])}
         all_ids = [os.path.splitext(os.path.basename(p))[0]
@@ -1099,21 +1328,128 @@ with tab8:
         for pid in other_ids:
             options.append(f"📖 其他本地PDF [{pid}]")
 
+        # 搜索跳转联动: 有跳转目标时下拉默认选中该论文
+        _jump_id = st.session_state.get("pdf_jump_id")
+        _default_idx = 0
+        if _jump_id:
+            for _oi, _opt in enumerate(options):
+                if _opt.endswith(f"[{_jump_id}]"):
+                    _default_idx = _oi
+                    break
+
         choice = st.selectbox(
             f"选择论文（本次检索{len(retrieved)}篇 · "
             f"其他本地{len(other_ids)}篇）",
             options,
+            index=_default_idx,
         )
         # 从label反解arxiv_id（末尾方括号里）
         chosen_id = choice[choice.rfind("[") + 1:-1]
         pdf_path = id_path[chosen_id]
 
         m = meta_by_id.get(chosen_id)
+        _paper_title_disp = m.title if m else chosen_id
         if m:
             st.markdown(f"**{m.title}** · {m.year} · "
                         f"被引{m.cited_by} · arXiv:{chosen_id}")
         else:
             st.caption(f"arXiv:{chosen_id}")
+
+        # =============================================================
+        # 成员C · 模块3: 阅读笔记（绑定文献ID+页码，本地持久化）
+        # =============================================================
+        try:
+            import notes_store as _ns
+
+            _notes = _ns.list_notes(chosen_id)
+            with st.expander(f"📝 阅读笔记（本篇 {len(_notes)} 条）",
+                             expanded=bool(st.session_state.get(
+                                 "note_prefill")) or len(_notes) > 0):
+                # ---- 添加/编辑表单 ----
+                _editing = st.session_state.get("note_editing")
+                _prefill_q = st.session_state.pop("note_prefill", "")
+                if _editing:
+                    _src = next((n for n in _notes
+                                 if n["id"] == _editing), None)
+                else:
+                    _src = None
+                with st.form("note_form", clear_on_submit=True):
+                    st.markdown("**➕ 添加笔记**（批注绑定本篇文献与页码，"
+                                "保存在本地）" if not _src
+                               else f"**✏️ 编辑笔记** `{_editing}`")
+                    _nf1, _nf2 = st.columns([1, 2])
+                    with _nf1:
+                        _n_page = st.number_input(
+                            "页码", min_value=1, max_value=99,
+                            value=(_src["page"] + 1) if _src else 1,
+                            help="1-based页码，与下方页标一致")
+                    with _nf2:
+                        _n_quote = st.text_area(
+                            "选中段落（可从PDF/搜索结果复制，可留空）",
+                            value=(_src["quote"] if _src else _prefill_q),
+                            height=68)
+                    _n_text = st.text_area(
+                        "批注内容",
+                        value=(_src["note"] if _src else ""), height=68)
+                    _sv, _cancel = st.columns(2)
+                    with _sv:
+                        _submitted = st.form_submit_button(
+                            "💾 保存", type="primary", use_container_width=True)
+                    with _cancel:
+                        if _src and st.form_submit_button(
+                                "取消编辑", use_container_width=True):
+                            st.session_state.note_editing = None
+                            st.rerun()
+                # form渲染必须在with块内完成，提交处理放块外
+                if _submitted:
+                    try:
+                        if _src:
+                            _ns.update_note(
+                                _src["id"], quote=_n_quote, note=_n_text,
+                                page=int(_n_page) - 1)
+                            st.session_state.note_editing = None
+                            st.toast("✅ 笔记已更新")
+                        else:
+                            _ns.add_note(
+                                chosen_id, int(_n_page) - 1,
+                                _n_quote, _n_text,
+                                paper_title=_paper_title_disp)
+                            st.toast("✅ 笔记已保存")
+                        st.rerun()
+                    except ValueError as _ve:
+                        st.error(f"保存失败: {_ve}")
+
+                # ---- 笔记列表（按页码分组） ----
+                if _notes:
+                    st.divider()
+                    for _nt in _notes:
+                        _e1, _e2, _e3 = st.columns([6, 1, 1])
+                        with _e1:
+                            st.markdown(
+                                f"💬 **第{_nt['page'] + 1}页** · "
+                                + time.strftime(
+                                    "%m-%d %H:%M",
+                                    time.localtime(_nt["created_at"])))
+                            if _nt["quote"]:
+                                st.markdown(
+                                    f"> {_nt['quote'][:160]}"
+                                    + ("…" if len(_nt["quote"]) > 160 else ""))
+                            if _nt["note"]:
+                                st.markdown(_nt["note"][:400])
+                            st.caption("")
+                        with _e2:
+                            if st.button("✏️", key=f"ne_{_nt['id']}",
+                                         help="编辑"):
+                                st.session_state.note_editing = _nt["id"]
+                                st.rerun()
+                        with _e3:
+                            if st.button("🗑", key=f"nd_{_nt['id']}",
+                                         help="删除"):
+                                _ns.delete_note(_nt["id"])
+                                st.toast("已删除")
+                                st.rerun()
+        except Exception as _ns_err:
+            st.caption(f"笔记功能暂不可用: {_ns_err}")
 
         # ---- 按页渲染为图片显示（可靠方案）----
         # 背景: base64数据URI内嵌PDF会被Streamlit组件的沙箱iframe
@@ -1140,20 +1476,97 @@ with tab8:
             st.error(f"PDF解析失败: {e}")
             st.stop()
 
-        # 连续滚动阅读: 全部页面纵向排列，滚轮从头读到尾，
-        # 无需逐页点击（首次渲染整篇需数秒，之后有缓存秒开）
-        st.caption(f"共 {n_pages} 页 · 滚动阅读 · 📎证据标注的页码与"
-                   f"下方页码标对应")
-        prog = st.progress(0.0, text="正在渲染整篇论文...")
-        for i in range(n_pages):
-            st.image(
-                _render_page(pdf_path, i),
-                caption=f"—— 第 {i + 1} 页 / 共 {n_pages} 页 ——",
-                use_container_width=True,
-            )
-            prog.progress((i + 1) / n_pages,
-                          text=f"已渲染 {i + 1}/{n_pages} 页")
-        prog.empty()
+        # =============================================================
+        # 核心名词速查对照面板（全模式通用，数量无上限，可隐藏）
+        # 数据源: 最近一次三模式流水线生成的速查表
+        # （run_pipeline模式路径写入会话+glossary_last.json）
+        # =============================================================
+        _gloss_md = st.session_state.get("glossary_md") or ""
+        if not _gloss_md:
+            _gpath = os.path.join(config.DATA_DIR, "glossary_last.json")
+            if os.path.exists(_gpath):
+                try:
+                    with open(_gpath, "r", encoding="utf-8") as f:
+                        _gd = json.load(f)
+                    _gloss_md = _gd.get("md") or ""
+                    if _gloss_md:
+                        st.session_state.glossary_topic = \
+                            _gd.get("topic", "")
+                except Exception:
+                    pass
+        if _gloss_md:
+            _show_g = st.toggle(
+                "📖 核心名词速查对照（右侧随读随查，再点一次隐藏）",
+                value=st.session_state.get("gloss_show", False),
+                key="gloss_show",
+                help="来自最近一次模式检索报告的核心名词速查表，"
+                     "在阅读区右侧常驻对照；关闭后恢复全宽阅读")
+            if _show_g:
+                _rc, _gc = st.columns([2.9, 1.1], gap="small")
+                with _gc:
+                    st.markdown("##### 📖 核心名词速查")
+                    _gt = st.session_state.get("glossary_topic", "")
+                    if _gt:
+                        st.caption(f"来自模式检索: {_gt[:40]}")
+                    st.markdown(_gloss_md)
+            else:
+                _rc = st.container()
+        else:
+            _rc = st.container()
+
+        # 页码选择器 + 跳转目标页置顶渲染（模块2: 跳转原文页码）
+        _jump_page = st.session_state.get("pdf_jump_page")
+        _jump_active = (_jump_id == chosen_id and _jump_page is not None
+                        and 0 <= _jump_page < n_pages)
+
+        with _rc:
+            if _jump_active:
+                st.success(f"⬆️ 已跳转: 第 {_jump_page + 1} 页"
+                           f"（来自搜索结果，下方为该页，继续滚动可读全文）")
+                st.image(
+                    _render_page(pdf_path, _jump_page),
+                    caption=f"★ 跳转目标 · 第 {_jump_page + 1} 页 / "
+                            f"共 {n_pages} 页 ★",
+                    use_container_width=True,
+                )
+                # 消费后清理跳转标记（刷新后不残留）
+                del st.session_state.pdf_jump_id
+                del st.session_state.pdf_jump_page
+
+            # 连续滚动阅读: 全部页面纵向排列，滚轮从头读到尾，
+            # 无需逐页点击（首次渲染整篇需数秒，之后有缓存秒开）
+            st.caption(f"共 {n_pages} 页 · 滚动阅读 · 📎证据标注的页码与"
+                       f"下方页码标对应 · 有💬标记的页含笔记")
+            # 页码->笔记索引（模块3: 逐页笔记展示）
+            try:
+                import notes_store as _ns_pg
+                _pg_notes: dict[int, list] = {}
+                for _pn in _ns_pg.list_notes(chosen_id):
+                    _pg_notes.setdefault(_pn["page"], []).append(_pn)
+            except Exception:
+                _pg_notes = {}
+
+            prog = st.progress(0.0, text="正在渲染整篇论文...")
+            for i in range(n_pages):
+                _mark = f" · 💬笔记×{len(_pg_notes.get(i, []))}" \
+                    if i in _pg_notes else ""
+                st.image(
+                    _render_page(pdf_path, i),
+                    caption=f"—— 第 {i + 1} 页 / 共 {n_pages} 页{_mark} ——",
+                    use_container_width=True,
+                )
+                # 该页笔记紧凑展示（引用+批注各一行）
+                for _pn2 in _pg_notes.get(i, [])[:3]:
+                    _q_txt = _pn2["quote"][:80] + \
+                        ("…" if len(_pn2["quote"]) > 80 else "") \
+                        if _pn2["quote"] else ""
+                    st.markdown(
+                        f"💬 *第{i + 1}页笔记*: "
+                        + (f"「{_q_txt}」— " if _q_txt else "")
+                        + _pn2["note"][:200])
+                prog.progress((i + 1) / n_pages,
+                              text=f"已渲染 {i + 1}/{n_pages} 页")
+            prog.empty()
 
         # 下载兜底（需要原生PDF阅读器/离线细读时使用）
         with open(pdf_path, "rb") as f:
@@ -1163,6 +1576,152 @@ with tab8:
                 file_name=f"{chosen_id}.pdf",
                 mime="application/pdf",
             )
+
+# ---- 标签C: 对比阅读（成员C · 模块4: 双文献并排卡片对比）----
+with tabC:
+    st.subheader("⚔️ 对比阅读")
+    st.caption("任选两篇论文并排对比**背景 / 方法 / 结论 / 争议点**，"
+               "联动阅读笔记与全文检索。信息来自已核验的声明卡片"
+               "（流水线未跑完时方法/结论区会提示降级，背景摘要仍可用）。")
+
+    try:
+        import compare_view as _cv
+        import notes_store as _ns_c
+
+        _sel = _cv.selectable_papers()
+        if len(_sel) < 2:
+            st.info("本地论文不足2篇，无法对比。请先运行流水线"
+                    "（或把PDF放入 papers/ 目录）。")
+        else:
+            _labels = [s["label"] for s in _sel]
+            _id_by_label = {s["label"]: s["id"] for s in _sel}
+
+            # ---- 选择区（等宽双列，防布局错乱的核心: 固定[1,1]比例）----
+            _sa_col, _sb_col = st.columns([1, 1])
+            with _sa_col:
+                _la = st.selectbox("📜 论文 A", _labels, index=0,
+                                   key="cmp_a")
+            with _sb_col:
+                _lb = st.selectbox("📜 论文 B", _labels, index=1
+                                   if len(_labels) > 1 else 0, key="cmp_b")
+            _ida, _idb = _id_by_label[_la], _id_by_label[_lb]
+
+            if _ida == _idb:
+                st.warning("请选择两篇不同的论文（A 与 B 当前相同）")
+            else:
+                _pa = _cv.build_paper_profile(_ida)
+                _pb = _cv.build_paper_profile(_idb)
+                _pcs = _cv.pair_conflicts(_ida, _idb)
+
+                # ---- 双卡片并排渲染 ----
+                _card_a, _card_b = st.columns([1, 1], gap="medium")
+
+                def _render_cmp_card(col, prof):
+                    """单侧对比卡片（模块4核心渲染，布局防错乱:
+                    长文本一律截断+expander收纳，绝不让文本撑破列宽）"""
+                    with col:
+                        _yr = f" · {prof['year']}" if prof.get("year") else ""
+                        st.markdown(
+                            f"### 📄 {prof['title'][:48]}"
+                            + ("…" if len(prof["title"]) > 48 else ""))
+                        st.caption(
+                            f"arXiv:{prof['paper_id']}{_yr} · "
+                            f"被引{prof.get('cited_by', 0)} · "
+                            f"作者: {', '.join(prof['authors'][:3])}"
+                            + (" 等" if len(prof["authors"]) > 3 else ""))
+
+                        with st.expander("🧭 背景（摘要）", expanded=True):
+                            _ab = prof["abstract"]
+                            st.markdown(_ab[:300]
+                                        + ("…\n\n*展开「查看完整摘要」*"
+                                           if len(_ab) > 300 else ""))
+                            if len(_ab) > 300:
+                                if st.toggle("查看完整摘要",
+                                             key=f"ab_{prof['paper_id']}"):
+                                    st.markdown(_ab)
+
+                        if prof["has_card"]:
+                            with st.expander(
+                                    f"🔧 方法（{len(prof['methods'])}条已核验声明）",
+                                    expanded=True):
+                                for _cm in prof["methods"][:4]:
+                                    st.markdown(f"- {_cm[:150]}"
+                                                + ("…" if len(_cm) > 150
+                                                   else ""))
+                            with st.expander(
+                                    f"🎯 结论（{len(prof['results'])}条）",
+                                    expanded=True):
+                                for _cr in prof["results"][:4]:
+                                    st.markdown(f"- {_cr[:150]}"
+                                                + ("…" if len(_cr) > 150
+                                                   else ""))
+                        else:
+                            st.info("🔧 方法/结论: 需完整运行流水线生成"
+                                    "声明卡片后展示（当前仅有背景摘要）",
+                                    icon="ℹ️")
+
+                        if prof["limitations"]:
+                            with st.expander(
+                                    f"⚠️ 局限性（{len(prof['limitations'])}条）"):
+                                for _cl in prof["limitations"][:3]:
+                                    st.markdown(f"- {_cl[:150]}"
+                                                + ("…" if len(_cl) > 150
+                                                   else ""))
+
+                        # ---- 笔记联动（模块3 ↔ 模块4）----
+                        with st.expander(
+                                f"📝 笔记（{prof['notes_count']}条）"):
+                            if prof["recent_notes"]:
+                                for _rn in prof["recent_notes"]:
+                                    st.markdown(
+                                        f"💬 **第{_rn['page'] + 1}页** · "
+                                        f"{_rn['note'][:120]}")
+                            else:
+                                st.caption("暂无笔记。到「📚 论文原文」"
+                                           "标签页阅读时可添加")
+                            if st.button("📖 去阅读这篇",
+                                         key=f"rd_{prof['paper_id']}",
+                                         use_container_width=True):
+                                st.session_state.pdf_jump_id = \
+                                    prof["paper_id"]
+                                st.session_state.pdf_jump_page = 0
+                                st.toast("已定位该论文，请切到「📚 论文原文」"
+                                         "标签页查看")
+
+                _render_cmp_card(_card_a, _pa)
+                _render_cmp_card(_card_b, _pb)
+
+                # ---- 争议点（两篇之间的冲突，居中单列避免双栏错乱）----
+                st.divider()
+                st.markdown("#### ⚡ 两篇之间的争议点")
+                if _pcs:
+                    for _pc in _pcs:
+                        _icon = "🔴" if _pc["relation"] == "contradict" \
+                            else "🟡"
+                        _rel = "直接矛盾" if _pc["relation"] == "contradict" \
+                            else "学术张力"
+                        with st.expander(
+                                f"{_icon} [{_rel}] {_pc['topic']} "
+                                f"(严重度{_pc['severity']:.1f})",
+                                expanded=True):
+                            st.markdown(f"**A方**: {_pc['a_content']}")
+                            st.markdown(f"**B方**: {_pc['b_content']}")
+                            st.markdown(f"> 🧭 解读: {_pc['explanation']}")
+                elif _pa["has_card"] and _pb["has_card"]:
+                    st.success("两篇论文之间未发现直接矛盾或张力"
+                               "（基于已核验声明的矛盾检测）")
+                else:
+                    st.caption("争议点需矛盾检测产出（完整运行流水线后"
+                               "自动生成）")
+
+                # ---- 全文检索联动提示（模块2 ↔ 模块4）----
+                st.divider()
+                st.caption("🔗 想深挖某篇? 到「📚 论文原文」标签页的"
+                           "「🔍 PDF全文搜索」输入关键词，可跨全部本地论文"
+                           "检索并高亮跳转；两篇论文的笔记与阅读进度"
+                           "也已在上文卡片联动展示。")
+    except Exception as _cv_err:
+        st.caption(f"对比视图暂不可用: {_cv_err}")
 
 # ---- 标签9: AI助手（系统使用 + 论文内容 全能问答）----
 with tab9:
@@ -1193,13 +1752,23 @@ with tab9:
             "高亮穿透)和矛盾检测(学术争议发现)两个后处理。\n"
             "- 操作: 左侧边栏输入研究主题（建议具体，如'脉冲神经网络的"
             "高效训练方法'），选目标论文数，点'🚀 完整运行'（约10-15分钟，"
-            "运行中勿重复点击）；已有结果点'📂 载入已有结果'。\n"
+            "运行中勿重复点击）；已有结果点'📂 载入已有结果'。"
+            "侧边栏「检索方式」可选标准或三模式作为流水线检索阶段"
+            "（模式未命中自动降级标准检索，降级后仍未命中才终止流水线）。\n"
+            "- 🎯三模式检索(🌱入门综述/🚀前沿突破/🔀交叉领域): 通过侧边栏"
+            "「检索方式」选择，作为流水线的检索阶段运行，命中文献"
+            "进入提取→审查→综合全流程；流水线还会为命中论文生成"
+            "数量无上限的核心名词速查表。\n"
             "- 标签页(两层导航): 第一层常用=🔍检索结果(四种排序+徽章) | "
-            "📝最终报告(可生成🍼小白解读) | 💬可信问答(仅基于声明池、"
+            "📝最终报告(可生成🍼小白解读，支持Word/LaTeX导出) | "
+            "💬可信问答(仅基于声明池、"
             "证据不足会拒答) | 🤖AI助手(本页面)；第二层🗂更多=📄信息卡片"
             "(每篇论文的声明+📎证据原文) | ✅审查明细(每条声明核验结果) | "
             "⚡学术争议(论文间矛盾) | 📊综述表格 | 🕸引用图谱 | "
-            "📚论文原文(滚动阅读PDF) | 📖新手指南(3分钟入门)。\n"
+            "📚论文原文(PDF滚动阅读+🔍全文搜索跨文档高亮跳页+📝页面级"
+            "笔记增删改+📖核心名词速查对照面板可显示隐藏) | "
+            "⚔️对比阅读(双文献并排卡片: 背景/方法/结论/"
+            "争议点，联动笔记) | 📖新手指南(3分钟入门)。\n"
             "- 关键指标: 声明=从论文摘出的可核实信息；通过核验=引用真实"
             "且无夸大；幻觉率=AI表述与论文原文不符比例（越低越可信）；"
             "可穿透证据=能定位到PDF原文高亮处的声明数。\n"
