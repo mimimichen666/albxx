@@ -37,52 +37,53 @@ def _normalize(text: str) -> str:
     return " ".join(text.split()).lower()
 
 
-def quote_alignment(quote_text: str, full_text_norm: str,
-                    fragment_len: int = 80, threshold: float = 0.85) -> bool:
+def quote_alignment(quote_text, full_text_norm, fragment_len=80, threshold=0.85):
     """
-    检查一条引用是否真实存在于原文中（模糊对齐）
+    判断引用文本是否真实存在于论文全文中。
 
-    方法:
-        取引用前 fragment_len 个字符作为"探针"，在原文上滑动窗口，
-        用 SequenceMatcher 计算最大相似度。超过阈值即认为对齐成功。
-
-    为什么用模糊匹配而不是精确包含:
-        PDF解析会把连字符断词、公式、脚注标记混入文本，
-        LM引用时可能丢掉几个字符。精确匹配会把"基本忠实"误判为伪造，
-        0.85阈值能容忍小噪声，同时抓住编造内容（编造的相似度通常<0.5）。
-
-    参数:
-        quote_text: 引用文本
-        full_text_norm: 归一化后的论文全文
-        fragment_len: 探针长度（引用太长时只取前80字符，够用了）
-        threshold: 对齐成功阈值
-
-    返回:
-        True=引用真实存在于原文; False=疑似伪造
+    匹配策略：
+    1. 先进行标准化后的精确子串匹配
+    2. 精确匹配失败后，再进行模糊匹配
     """
-    probe = _normalize(quote_text)[:fragment_len]
-    if len(probe) < 10:  # 引用过短无法可靠判断，直接放行（后续语义核验兜底）
+
+    if not quote_text or not full_text_norm:
+        return False
+
+    quote = _normalize(quote_text)
+    full_text = _normalize(full_text_norm)
+
+    if not quote:
+        return False
+
+    # ① 优先进行精确匹配
+    # 可以避免固定窗口导致的漏检
+    if quote in full_text:
         return True
 
-    # 滑动窗口找最大相似度
-    # 窗口长度=探针长度（窗口更长会把完全包含的匹配稀释到阈值以下：
-    # ratio=2M/(len1+len2)，长度差越大分越低）
-    best = 0.0
-    window = len(probe)
-    step = 20  # 细步长：保证不跳过对齐位置
-    for i in range(0, max(1, len(full_text_norm) - window + 1), step):
-        candidate = full_text_norm[i:i + window]
-        # 先用quick_ratio粗筛（它是上界，快），通过再精算
-        ratio = SequenceMatcher(None, probe, candidate).quick_ratio()
-        if ratio > threshold:
-            exact = SequenceMatcher(None, probe, candidate).ratio()
-            best = max(best, exact)
-            if best >= threshold:
-                return True  # 提前退出：已经找到足够好的对齐
-        else:
-            best = max(best, ratio * 0.9)  # 粗筛值打9折保守记录
-    return best >= threshold
+    # ② 太短的引用容易产生误判
+    if len(quote) < 10:
+        return False
 
+    # ③ 精确匹配失败后，再进行模糊匹配
+    fragment = quote[:fragment_len]
+
+    window_size = len(fragment)
+    step = 20
+
+    for i in range(0, max(1, len(full_text) - window_size + 1), step):
+        window = full_text[i:i + window_size]
+
+        matcher = SequenceMatcher(None, fragment, window)
+
+        # 先使用 quick_ratio() 快速过滤
+        if matcher.quick_ratio() < threshold:
+            continue
+
+        # 再使用 ratio() 精确判断
+        if matcher.ratio() >= threshold:
+            return True
+
+    return False
 
 # ---------------------------------------------------------------
 # 第2级：LLM语义核验
