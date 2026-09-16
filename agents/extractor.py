@@ -26,14 +26,16 @@ from models import PaperMeta, PaperCard
 # ---------------------------------------------------------------
 # 第1段：PDF → 纯文本
 # ---------------------------------------------------------------
-def pdf_to_text(pdf_path: str, max_chars: int = 60_000) -> str:
+def pdf_to_text(pdf_path: str, max_chars: int = 100_000) -> str:
     """
     解析PDF全文并做简易清洗
 
     参数:
         pdf_path: PDF文件路径
-        max_chars: 截断上限（约15万token的保险丝；glm-4-flash上下文128K，
-                   60K字符≈15万token内很安全。正常论文全文不会触顶）
+        max_chars: 截断上限（2026-09-14由60K提到100K——AutoSNN等
+                   长论文78K字符也被截断，导致附录里的实验细节丢失。
+                   100K字符英文≈2.5万token，距128K上下文模型的上限
+                   仍有充足余量；deepseek 64K上下文同样安全）
 
     返回:
         清洗后的全文文本

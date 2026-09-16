@@ -40,6 +40,13 @@ MODEL_NAME = os.environ.get("LLM_MODEL", "deepseek-chat")
 S2_API_KEY = os.environ.get("S2_API_KEY", "")
 
 # ---------------------------------------------------------------
+# 一之三、云端部署访问密码（Streamlit Cloud / HF Spaces）
+# ---------------------------------------------------------------
+# 部署到公网时设一个密码，陌生人必须先输密码才能使用。
+# 本地开发留空或不设置 → 密码门不启用。
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
+
+# ---------------------------------------------------------------
 # 二、各Agent的温度参数（temperature）
 # ---------------------------------------------------------------
 # 温度越低输出越稳定。提取/审查任务要求"忠实原文"，用 0.1；
@@ -85,3 +92,5 @@ if os.path.exists(_env_file):
                         MODEL_NAME = value
                 elif key == "S2_API_KEY":
                     S2_API_KEY = S2_API_KEY or value
+                elif key == "APP_PASSWORD":
+                    APP_PASSWORD = APP_PASSWORD or value

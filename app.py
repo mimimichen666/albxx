@@ -24,6 +24,23 @@ import streamlit as st
 # 项目根目录加入path（streamlit的工作目录可能不同）
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# ---------------------------------------------------------------
+# 云端 Secrets 同步到环境变量（兼容 Streamlit Cloud / HF Spaces）
+# ---------------------------------------------------------------
+# 本地开发用 .env 文件，云端部署用平台 Secrets（st.secrets 读取）。
+# 这里把云端 secrets 值同步到环境变量，让 config.py 用同一套
+# os.environ 读取逻辑就能拿到值，无需改 config.py
+try:
+    _keys_to_sync = ["LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL",
+                     "S2_API_KEY", "APP_PASSWORD"]
+    for _k in _keys_to_sync:
+        if _k not in os.environ and _k in st.secrets:
+            os.environ[_k] = st.secrets[_k]
+except Exception:
+    # 没有 secrets 文件 / 本地开发 / 任何原因异常 → 静默跳过
+    # 密码门会直接查 st.secrets 做兜底，同步失败不影响密码门
+    pass
+
 import config
 from models import PaperMeta, PaperCard, ReviewResult
 
@@ -38,6 +55,54 @@ st.set_page_config(
     page_icon="📚",
     layout="wide",
 )
+
+# ---------------------------------------------------------------
+# 访问密码门（云端部署防护）
+# ---------------------------------------------------------------
+# 部署到公网时，陌生访客必须先输密码才能用——否则他们随手点一下
+# 「完整运行」就会触发流水线，消耗你的 LLM API 额度（一次几十次调用）
+# 密码来源（优先级从高到低）:
+#   1. config.APP_PASSWORD（本地 .env 或环境变量）
+#   2. st.secrets["APP_PASSWORD"]（Streamlit Cloud / HF Spaces 平台 Secrets）
+try:
+    _pwd = config.APP_PASSWORD or (
+        st.secrets.get("APP_PASSWORD", "") if "APP_PASSWORD" in st.secrets else ""
+    )
+except Exception:
+    _pwd = config.APP_PASSWORD
+
+if _pwd:
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+    if not st.session_state.authenticated:
+        # 未登录: 只渲染一个简洁登录页，主应用所有内容都不要执行
+        st.markdown("""
+        <div style="
+            max-width: 360px; margin: 8vh auto; padding: 32px 28px;
+            background: #FFFFFF; border: 1px solid #E2E8F0;
+            border-radius: 14px; box-shadow: 0 8px 24px rgba(15,23,42,.08);
+            text-align: center;">
+            <div style="font-size: 2rem;">📚</div>
+            <div style="font-size: 1.3rem; font-weight: 800;
+                        color: #4F46E5; margin: 8px 0 4px;">
+                科研文献整理 Agent
+            </div>
+            <div style="color: #64748B; font-size: .9rem; margin-bottom: 18px;">
+                请输入访问密码
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        with st.form("login_form"):
+            pwd = st.text_input("访问密码", type="password")
+            submitted = st.form_submit_button("登录", type="primary",
+                                              use_container_width=True)
+            if submitted:
+                if pwd == _pwd:
+                    st.session_state.authenticated = True
+                    st.rerun()
+                else:
+                    st.error("密码错误，请重试")
+        st.stop()
 
 # ---------------------------------------------------------------
 # 全局视觉设计系统（对齐主流SaaS产品观感）
