@@ -9,6 +9,8 @@ models.py —— Pydantic 数据结构定义
   -> ReviewResult(审查) -> 最终综述报告
 """
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -120,42 +122,116 @@ class PaperCard(BaseModel):
 # 4. 审查Agent的输出：核验结果（★幻觉率量化实验的核心）
 # ===============================================================
 class ReviewVerdict(BaseModel):
-    """对单条声明的核验判定"""
-    verdict: str = Field(
-        description="判定结果: supported(原文支持) / unsupported(原文不支持) "
-                    "/ contradicted(与原文矛盾)"
+    """对单条声明的核验判定。"""
+    verdict: Literal["supported", "unsupported", "contradicted"] = Field(
+        description="supported=原文支持；unsupported=原文不支持；contradicted=与原文矛盾"
     )
     reason: str = Field(description="一句话判定理由")
     confidence: float = Field(
-        description="判定置信度0-1",
-        ge=0.0, le=1.0,
+        description="判定置信度0-1", ge=0.0, le=1.0,
     )
 
 
 class ReviewResult(BaseModel):
-    """一次完整的核验记录（用于计算幻觉率）"""
+    """一次完整的核验记录。
+
+    新增字段均有默认值，保证旧版 review_results.json 仍可加载。
+    """
     arxiv_id: str = Field(description="所属论文")
     claim_index: int = Field(description="声明在PaperCard.claims中的下标")
     claim_content: str = Field(description="声明内容（冗余存储，方便人工标注）")
     quote_alignment: bool = Field(
-        description="程序化引用对齐结果: True=引用确实存在于原文, False=引用系伪造"
+        description="是否至少有一条引用与论文原文对齐"
     )
     verdict: ReviewVerdict = Field(description="LLM审查员的语义核验判定")
+    aligned_quote_count: int = Field(
+        default=0, ge=0, description="成功对齐的引用数量"
+    )
+    quote_count: int = Field(
+        default=0, ge=0, description="该声明的引用总数"
+    )
+    hallucination: bool = Field(
+        default=False, description="按统一协议，该声明是否判定为幻觉"
+    )
+    failure_mode: Literal["none", "fake_quote", "unsupported", "contradicted", "mixed"] = Field(
+        default="none", description="失败模式，便于D Benchmark统计"
+    )
+    review_latency_ms: float | None = Field(
+        default=None, ge=0, description="该声明两级核验耗时（毫秒）"
+    )
+
+
+class BenchmarkCase(BaseModel):
+    """D Benchmark 的单条人工标注样本。
+
+    gold_verdict 是人工/数据集标签，不参与模型判定，只用于离线评测。
+    """
+    case_id: str
+    arxiv_id: str | None = None
+    claim_content: str
+    evidence_text: str
+    quote_text: str | None = None
+    full_text: str | None = None
+    gold_verdict: Literal["supported", "unsupported", "contradicted"]
+    gold_quote_alignment: bool
+
+
+class BenchmarkResult(BaseModel):
+    """D Benchmark 单条样本的预测结果。"""
+    case_id: str
+    predicted_verdict: Literal["supported", "unsupported", "contradicted"]
+    predicted_quote_alignment: bool
+    verdict_correct: bool
+    alignment_correct: bool
+
+
+class BenchmarkReport(BaseModel):
+    """D Benchmark 汇总指标。"""
+    total_cases: int
+    verdict_correct: int
+    alignment_correct: int
+    supported_cases: int
+    unsupported_cases: int
+    contradicted_cases: int
+    verdict_accuracy: float
+    alignment_accuracy: float
+    macro_f1: float
+    results: list[BenchmarkResult] = Field(default_factory=list)
 
 
 # ===============================================================
 # 5. 幻觉率统计（实验E1的产出）
 # ===============================================================
 class HallucinationReport(BaseModel):
-    """一轮实验的幻觉率统计报告"""
+    """一轮实验的幻觉率统计报告。
+
+    hallucinations 使用“并集”计数：一条声明即使同时引用失败且语义失败，也只计一次。
+    """
     total_claims: int = Field(description="送审的声明总数")
-    supported: int = Field(description="判定为'原文支持'的条数")
-    unsupported: int = Field(description="判定为'原文不支持'的条数")
-    contradicted: int = Field(description="判定为'与原文矛盾'的条数")
-    fake_quotes: int = Field(description="程序检测出的伪造引用条数")
+    supported: int = Field(description="语义判定为原文支持的条数")
+    unsupported: int = Field(description="语义判定为原文不支持的条数")
+    contradicted: int = Field(description="语义判定为与原文矛盾的条数")
+    fake_quotes: int = Field(description="程序检测出的引用未对齐条数")
+    hallucinations: int | None = Field(
+        default=None, ge=0, description="按统一协议判定为幻觉的声明数（去重后）"
+    )
+    aligned_quotes: int | None = Field(
+        default=None, ge=0, description="至少一条引用成功对齐的声明数"
+    )
+
+    @property
+    def hallucination_count(self) -> int:
+        if self.hallucinations is not None:
+            return self.hallucinations
+        return min(self.total_claims, self.unsupported + self.contradicted + self.fake_quotes)
 
     @property
     def hallucination_rate(self) -> float:
-        """幻觉率 = (不支持+矛盾+伪造引用) / 总声明数"""
-        bad = self.unsupported + self.contradicted + self.fake_quotes
-        return bad / self.total_claims if self.total_claims else 0.0
+        return self.hallucination_count / self.total_claims if self.total_claims else 0.0
+
+    @property
+    def quote_alignment_rate(self) -> float:
+        aligned = self.aligned_quotes
+        if aligned is None:
+            aligned = self.total_claims - self.fake_quotes
+        return aligned / self.total_claims if self.total_claims else 0.0

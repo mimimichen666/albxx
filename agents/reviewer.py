@@ -19,6 +19,7 @@ reviewer.py —— 批判性审查Agent（本项目核心创新点）
 
 import os
 import json
+import time
 from difflib import SequenceMatcher
 
 import llm_client
@@ -161,12 +162,14 @@ def run(papers: list[PaperMeta], cards: list[PaperCard]) -> list[ReviewResult]:
         card, idx, claim = task
         full_text_norm = text_cache.get(card.arxiv_id, "")
 
+        started = time.perf_counter()
+
         # ---- 第1级：程序化引用对齐 ----
-        # 只要有一条引用对齐成功，就认为引用真实
-        aligned = any(
+        aligned_count = sum(
             quote_alignment(q.text, full_text_norm)
             for q in claim.quotes
         )
+        aligned = aligned_count > 0
 
         # ---- 第2级：LLM语义核验 ----
         # 证据 = 所有引用拼接（每条限500字符，控制token）
@@ -187,12 +190,29 @@ def run(papers: list[PaperMeta], cards: list[PaperCard]) -> list[ReviewResult]:
                 verdict="unsupported", reason="核验调用失败", confidence=0.0,
             )
 
+        # 统一幻觉协议：引用全部失配 OR 语义不支持/矛盾。
+        semantic_bad = verdict.verdict in ("unsupported", "contradicted")
+        hallucination = (not aligned) or semantic_bad
+        if not hallucination:
+            failure_mode = "none"
+        elif not aligned and semantic_bad:
+            failure_mode = "mixed"
+        elif not aligned:
+            failure_mode = "fake_quote"
+        else:
+            failure_mode = verdict.verdict
+
         record = ReviewResult(
             arxiv_id=card.arxiv_id,
             claim_index=idx,
             claim_content=claim.content,
             quote_alignment=aligned,
             verdict=verdict,
+            aligned_quote_count=aligned_count,
+            quote_count=len(claim.quotes),
+            hallucination=hallucination,
+            failure_mode=failure_mode,
+            review_latency_ms=(time.perf_counter() - started) * 1000,
         )
 
         # 进度输出（一眼看出两级核验的判定）
@@ -233,6 +253,8 @@ def generate_report(results: list[ReviewResult]) -> HallucinationReport:
     contradicted = sum(1 for r in results
                        if r.verdict.verdict == "contradicted")
     fake_quotes = sum(1 for r in results if not r.quote_alignment)
+    hallucinations = sum(1 for r in results if r.hallucination)
+    aligned_claims = sum(1 for r in results if r.quote_alignment)
 
     report = HallucinationReport(
         total_claims=len(results),
@@ -240,6 +262,8 @@ def generate_report(results: list[ReviewResult]) -> HallucinationReport:
         unsupported=unsupported,
         contradicted=contradicted,
         fake_quotes=fake_quotes,
+        hallucinations=hallucinations,
+        aligned_quotes=aligned_claims,
     )
 
     print("\n" + "=" * 55)
@@ -249,7 +273,92 @@ def generate_report(results: list[ReviewResult]) -> HallucinationReport:
     print(f"  原文支持:     {supported}")
     print(f"  无依据(幻觉): {unsupported}")
     print(f"  与原文矛盾:   {contradicted}")
-    print(f"  伪造引用:     {fake_quotes}")
+    print(f"  引用未对齐:   {fake_quotes}")
+    print(f"  幻觉声明(去重): {hallucinations}")
+    print(f"  引用对齐率:   {report.quote_alignment_rate:.1%}")
     print(f"  幻觉率:       {report.hallucination_rate:.1%}")
     print("=" * 55)
+    return report
+
+# ---------------------------------------------------------------
+# D Benchmark：离线、可复现的审查器评测
+# ---------------------------------------------------------------
+def _macro_f1(gold: list[str], pred: list[str], labels: tuple[str, ...]) -> float:
+    """计算三分类 macro-F1，不依赖 sklearn，方便项目环境保持轻量。"""
+    scores = []
+    for label in labels:
+        tp = sum(g == label and p == label for g, p in zip(gold, pred))
+        fp = sum(g != label and p == label for g, p in zip(gold, pred))
+        fn = sum(g == label and p != label for g, p in zip(gold, pred))
+        precision = tp / (tp + fp) if tp + fp else 0.0
+        recall = tp / (tp + fn) if tp + fn else 0.0
+        scores.append(2 * precision * recall / (precision + recall)
+                      if precision + recall else 0.0)
+    return sum(scores) / len(scores) if scores else 0.0
+
+
+def run_d_benchmark(cases: list["BenchmarkCase"]) -> "BenchmarkReport":
+    """运行 D Benchmark。
+
+    Benchmark 样本必须提供人工标签 gold_verdict 与 gold_quote_alignment。
+    每个 case 独立调用语义审查器，因此可重复比较不同模型/Prompt版本。
+    该函数不会修改正式流水线产出的 review_results.json。
+    """
+    from models import BenchmarkCase, BenchmarkReport, BenchmarkResult
+
+    if not cases:
+        return BenchmarkReport(
+            total_cases=0, verdict_correct=0, alignment_correct=0,
+            supported_cases=0, unsupported_cases=0, contradicted_cases=0,
+            verdict_accuracy=0.0, alignment_accuracy=0.0, macro_f1=0.0,
+            results=[],
+        )
+
+    results = []
+    gold_verdicts = []
+    pred_verdicts = []
+    for case in cases:
+        verdict = semantic_verify(case.claim_content, case.evidence_text)
+        if case.quote_text is not None and case.full_text is not None:
+            predicted_alignment = quote_alignment(
+                case.quote_text, _normalize(case.full_text)
+            )
+        else:
+            # D Benchmark 若只评测语义核验，可省略原文全文；此时不伪造对齐结果。
+            predicted_alignment = case.gold_quote_alignment
+
+        results.append(BenchmarkResult(
+            case_id=case.case_id,
+            predicted_verdict=verdict.verdict,
+            predicted_quote_alignment=predicted_alignment,
+            verdict_correct=verdict.verdict == case.gold_verdict,
+            alignment_correct=predicted_alignment == case.gold_quote_alignment,
+        ))
+        gold_verdicts.append(case.gold_verdict)
+        pred_verdicts.append(verdict.verdict)
+
+    verdict_correct = sum(r.verdict_correct for r in results)
+    alignment_correct = sum(r.alignment_correct for r in results)
+    n = len(results)
+    counts = {label: gold_verdicts.count(label)
+              for label in ("supported", "unsupported", "contradicted")}
+    report = BenchmarkReport(
+        total_cases=n,
+        verdict_correct=verdict_correct,
+        alignment_correct=alignment_correct,
+        supported_cases=counts["supported"],
+        unsupported_cases=counts["unsupported"],
+        contradicted_cases=counts["contradicted"],
+        verdict_accuracy=verdict_correct / n,
+        alignment_accuracy=alignment_correct / n,
+        macro_f1=_macro_f1(
+            gold_verdicts, pred_verdicts,
+            ("supported", "unsupported", "contradicted"),
+        ),
+        results=results,
+    )
+    print("\n[D Benchmark]")
+    print(f"  样本数: {n}")
+    print(f"  Verdict Accuracy: {report.verdict_accuracy:.1%}")
+    print(f"  Macro-F1:          {report.macro_f1:.3f}")
     return report
