@@ -65,10 +65,13 @@ DATA_DIR = os.path.join(PROJECT_ROOT, "data")     # 证据库JSON存放处
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output") # 综合Agent的产出目录(表格/图谱/报告)
 
 # ---------------------------------------------------------------
-# 四、如果 .env 文件存在，则加载其中的配置（简易版，无需额外依赖）
+# 四、如果 .env 文件存在，则加载其中未被环境变量覆盖的配置
 # ---------------------------------------------------------------
+# 注意: 必须逐项补充而非"LLM密钥存在就跳过整个.env"——否则环境变量
+# 里设了LLM_API_KEY时，.env中的S2_API_KEY等其余配置将永远读不到
+# （2026-09-09实测踩坑: S2匿名模式持续429，密钥形同虚设）
 _env_file = os.path.join(PROJECT_ROOT, ".env")
-if os.path.exists(_env_file) and not API_KEY:
+if os.path.exists(_env_file):
     with open(_env_file, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -79,12 +82,15 @@ if os.path.exists(_env_file) and not API_KEY:
                 key, value = line.split("=", 1)
                 key, value = key.strip(), value.strip()
                 if key == "LLM_API_KEY":
-                    API_KEY = value
+                    API_KEY = API_KEY or value
                 elif key == "LLM_BASE_URL":
-                    BASE_URL = value
+                    # 环境变量显式设置 > .env > 内置默认
+                    if "LLM_BASE_URL" not in os.environ:
+                        BASE_URL = value
                 elif key == "LLM_MODEL":
-                    MODEL_NAME = value
+                    if "LLM_MODEL" not in os.environ:
+                        MODEL_NAME = value
                 elif key == "S2_API_KEY":
-                    S2_API_KEY = value
+                    S2_API_KEY = S2_API_KEY or value
                 elif key == "APP_PASSWORD":
-                    APP_PASSWORD = value
+                    APP_PASSWORD = APP_PASSWORD or value

@@ -12,7 +12,10 @@ searcher.py —— 检索Agent
       1次/秒独享额度，稳定可达
     - api.openalex.org   —— 稳定可达但免费额度仅$0.1/天(约100次
       请求)，耗尽后429持续到UTC午夜，只适合低量请求
-    - export.arxiv.org   —— 时通时断（间歇性阻断）
+    - export.arxiv.org   —— 时通时断（间歇性阻断；2026-09-09实测
+      http/https及arxiv.org/api全被连接重置，仅短期阻断属常态，
+      arXiv检索/救援已内置arxiv.org/search/主站HTML兜底——
+      API阻断期间主站页面仍200，实测可解析出完整结果）
   因此采用【S2主源 + OpenAlex引用链专用 + arXiv兜底】架构
   （2026-09-06调整，此前是OpenAlex主源，但每天跑1-2次流水线
   就烧穿额度导致429卡死）:
@@ -41,6 +44,7 @@ import os
 import re
 import time
 import json
+import html as _htmllib
 
 import requests
 
@@ -945,8 +949,70 @@ def _find_duplicate_by_openalex(w_id: str,
 
 
 # ---------------------------------------------------------------
-# 第1段-B：arXiv官方API检索（兜底1）
+# 第1段-B：arXiv官方API检索（兜底1；API被阻断时再走主站HTML兜底）
 # ---------------------------------------------------------------
+def _arxiv_search_html(kw: str, limit: int) -> list[PaperMeta]:
+    """
+    arXiv HTML搜索兜底: export.arxiv.org API被网络阻断（连接重置）时，
+    改走 https://arxiv.org/search/ 页面检索——实测API阻断期间
+    主站页面仍可正常访问（2026-09-09: API三变体全reset、主站200）。
+    """
+    try:
+        resp = requests.get(
+            "https://arxiv.org/search/",
+            params={"query": kw, "searchtype": "all", "size": 50},
+            timeout=30, headers={"User-Agent": "literature-agent/0.1"})
+        resp.raise_for_status()
+    except Exception as e:
+        print(f"[检索Agent] arXiv HTML兜底失败: {e}")
+        return []
+    time.sleep(3)  # arXiv官方礼貌限速
+
+    items = re.findall(r'<li class="arxiv-result">(.*?)</li>',
+                       resp.text, re.S)
+
+    def _clean(s: str) -> str:
+        # 高亮span在词中间时（如 Spike</span>-Timing）直接去除，
+        # 避免标题被拆成 "Spike -Timing"；其余标签替换为空白分隔
+        s = re.sub(r"</?span[^>]*>", "", s)
+        return " ".join(_htmllib.unescape(
+            re.sub(r"<[^>]+>", " ", s)).split())
+
+    papers = []
+    for it in items[:limit]:
+        m = re.search(r"arxiv\.org/abs/([0-9]{4}\.[0-9]{4,5}"
+                      r"|[a-z\-]+/\d{7})", it)
+        if not m:
+            continue
+        arxiv_id = m.group(1)
+        tm = re.search(r'<p class="title is-5 mathjax">(.*?)</p>', it, re.S)
+        title = _clean(tm.group(1)) if tm else ""
+        am = re.search(r'<p class="authors">(.*?)</p>', it, re.S)
+        authors = ([_clean(a) for a in
+                    re.findall(r">([^<>]+)</a>", am.group(1))] if am else [])[:5]
+        # 摘要: 取abstract-full到段落结束</p>——中途的内嵌高亮span
+        # 会让"到</span>"的匹配提前截断（实测30字符就断了）
+        bm = re.search(r'class="abstract-full[^"]*"[^>]*>(.*?)</p>',
+                       it, re.S)
+        abstract = _clean(bm.group(1)) if bm else ""
+        abstract = re.sub(r"△ Less\s*$", "", abstract).strip()
+        if not title or not abstract:
+            continue
+        # 日期: 实际格式为 "Submitted</span> 7 September, 2026"（标签分隔）
+        dm = re.search(r"Submitted\s*(?:</span>)?\s*"
+                       r"(\d{1,2})\s+([A-Za-z]+),?\s+(\d{4})", it)
+        year = int(dm.group(3)) if dm and dm.group(3).isdigit() else 0
+        papers.append(PaperMeta(
+            arxiv_id=arxiv_id,
+            title=title,
+            authors=[a for a in authors if a],
+            year=year,
+            abstract=abstract,
+            pdf_url=f"https://arxiv.org/pdf/{arxiv_id}",
+        ))
+    return papers
+
+
 def _arxiv_request(params: dict) -> str | None:
     """
     带缓存的arXiv API查询（成员A·任务1），返回原始XML文本
@@ -976,10 +1042,11 @@ def _arxiv_request(params: dict) -> str | None:
 
 def _arxiv_search(kw: str, limit: int) -> list[PaperMeta]:
     """
-    调用arXiv官方API检索单个关键词
+    调用arXiv官方API检索单个关键词（带缓存）；API不可达/0命中时
+    走arxiv.org主站HTML搜索兜底。
 
     返回:
-        PaperMeta列表；网络失败返回空列表（由上层切换到S2兜底）
+        PaperMeta列表；两条路径都失败返回空列表（由上层切换到S2/Crossref兜底）
     """
     import xml.etree.ElementTree as ET  # arXiv返回Atom XML格式
 
@@ -990,35 +1057,40 @@ def _arxiv_search(kw: str, limit: int) -> list[PaperMeta]:
         "max_results": limit,
         "sortBy": "relevance",
     }
-    xml_text = _arxiv_request(params)
-    if xml_text is None:
-        print("[检索Agent] arXiv API不可达，将切换兜底源")
-        return []
-
-    # 解析Atom XML（命名空间处理是标准写法）
-    ns = {"a": "http://www.w3.org/2005/Atom"}
-    root = ET.fromstring(xml_text)
     papers = []
-    for entry in root.findall("a:entry", ns):
-        # arXiv的entry.id形如 http://arxiv.org/abs/2401.12345v2
-        raw_id = entry.findtext("a:id", "", ns).split("/abs/")[-1]
-        arxiv_id = raw_id.split("v")[0] if raw_id[0].isdigit() else raw_id
-        abstract = (entry.findtext("a:summary", "", ns) or "").strip()
-        title = (entry.findtext("a:title", "", ns) or "").strip()
-        if not arxiv_id or not abstract or not title:
-            continue
+    xml_text = _arxiv_request(params)  # 带缓存的API查询
+    if xml_text is not None:
+        # 解析Atom XML（命名空间处理是标准写法）
+        ns = {"a": "http://www.w3.org/2005/Atom"}
+        try:
+            root = ET.fromstring(xml_text)
+        except ET.ParseError:
+            root = None
+        if root is not None:
+            for entry in root.findall("a:entry", ns):
+                # arXiv的entry.id形如 http://arxiv.org/abs/2401.12345v2
+                raw_id = entry.findtext("a:id", "", ns).split("/abs/")[-1]
+                arxiv_id = raw_id.split("v")[0] if raw_id[0].isdigit() else raw_id
+                abstract = (entry.findtext("a:summary", "", ns) or "").strip()
+                title = (entry.findtext("a:title", "", ns) or "").strip()
+                if not arxiv_id or not abstract or not title:
+                    continue
 
-        # 统一用 arxiv.org/pdf/{id} 作为下载地址（实测最稳的域名）
-        pdf_url = f"https://arxiv.org/pdf/{raw_id}"
-        papers.append(PaperMeta(
-            arxiv_id=arxiv_id,
-            title=title.replace("\n", " "),
-            authors=[a.findtext("a:name", "", ns)
-                     for a in entry.findall("a:author", ns)][:5],
-            year=int(entry.findtext("a:published", "0000", ns)[:4]),
-            abstract=abstract.replace("\n", " "),
-            pdf_url=pdf_url,
-        ))
+                # 统一用 arxiv.org/pdf/{id} 作为下载地址（实测最稳的域名）
+                pdf_url = f"https://arxiv.org/pdf/{raw_id}"
+                papers.append(PaperMeta(
+                    arxiv_id=arxiv_id,
+                    title=title.replace("\n", " "),
+                    authors=[a.findtext("a:name", "", ns)
+                             for a in entry.findall("a:author", ns)][:5],
+                    year=int(entry.findtext("a:published", "0000", ns)[:4]),
+                    abstract=abstract.replace("\n", " "),
+                    pdf_url=pdf_url,
+                ))
+    if not papers:
+        # API不可达/解析失败/0命中 → 主站HTML搜索兜底
+        print("[检索Agent] arXiv API不可用，切换主站HTML搜索兜底")
+        papers = _arxiv_search_html(kw, limit)
     return papers
 
 
@@ -1912,11 +1984,14 @@ def _arxiv_rescue(p: PaperMeta) -> bool:
     该论文很可能在arXiv有预印本副本（CS/AI领域尤其普遍）。
     用 ti:"标题" 精确检索arXiv，命中则从arxiv.org下载。
 
-    双通道（P2-2去单点）:
-        主通道: arXiv API标题检索 -> 编号
-        兜底通道: arXiv API不可达时，S2 search/match反查
-        externalIds.ArXiv -> 编号（PDF从arxiv.org下，API故障
-        不影响PDF主机，见_download_arxiv_by_id的说明）
+    三通道（去单点，逐级降级）:
+        主通道: arXiv API标题检索（带缓存）-> 编号
+        兜底1: API不可达时，S2 search/match反查 externalIds.ArXiv
+               -> 编号（PDF从arxiv.org下，API故障不影响PDF主机，
+               见_download_arxiv_by_id的说明）
+        兜底2: S2反查也无果时，arxiv.org主站HTML搜索兜底
+               （2026-09-09实测: API三变体全被连接重置、
+               主站页面仍200可解析）
 
     返回:
         True=救援成功(local_path已填充); False=arXiv上也没有
@@ -1938,31 +2013,41 @@ def _arxiv_rescue(p: PaperMeta) -> bool:
         "search_query": query,
         "max_results": 3,  # 取前3条逐一比对标题
     }
-    xml_text = _arxiv_request(params)  # 复用带缓存的arXiv查询入口
-    if xml_text is None:
-        # ---- 兜底通道: arXiv API单点故障 -> S2反查编号 ----
+
+    # 候选: (标题, arXiv原始id)，三个通道的结果汇入同一队列
+    candidates: list[tuple[str, str]] = []
+    xml_text = _arxiv_request(params)  # 主通道（带缓存）
+    if xml_text is not None:
+        ns = {"a": "http://www.w3.org/2005/Atom"}
+        try:
+            root = ET.fromstring(xml_text)
+        except ET.ParseError:
+            root = None
+        if root is not None:
+            for entry in root.findall("a:entry", ns):
+                candidates.append((
+                    (entry.findtext("a:title", "", ns) or "").strip(),
+                    entry.findtext("a:id", "", ns).split("/abs/")[-1]))
+
+    if not candidates:
+        # ---- 兜底1: arXiv API单点故障 -> S2反查编号 ----
         print("[检索Agent] arXiv API不可达，切换S2反查编号兜底...")
         aid = _s2_lookup_arxiv_id(p)
         if aid:
             return _download_arxiv_by_id(p, aid)
-        print("[检索Agent] 救援失败: arXiv API与S2反查均不可达")
-        return False
-
-    ns = {"a": "http://www.w3.org/2005/Atom"}
-    try:
-        root = ET.fromstring(xml_text)
-    except ET.ParseError:
-        return False
+        # ---- 兜底2: S2也无果 -> arxiv.org主站HTML搜索 ----
+        print("[检索Agent] S2反查无果，切换arxiv.org HTML兜底...")
+        for c in _arxiv_search_html(" ".join(words), 3):
+            candidates.append((c.title, c.arxiv_id))
 
     from difflib import SequenceMatcher
-    for entry in root.findall("a:entry", ns):
-        entry_title = (entry.findtext("a:title", "", ns) or "").strip()
+    for entry_title, raw_id in candidates:
         # 标题相似度校验（防止检索到只是同词的其他论文）
         if SequenceMatcher(None, clean_title.lower(),
                            entry_title.lower()).ratio() < 0.85:
             continue
-        raw_id = entry.findtext("a:id", "", ns).split("/abs/")[-1]
         return _download_arxiv_by_id(p, raw_id)
+    print("[检索Agent] 救援失败: 三通道均未命中")
     return False
 
 
