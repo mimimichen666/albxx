@@ -378,6 +378,7 @@ def _arxiv_search_html(kw: str, limit: int) -> list[Hit]:
 
 
 def _arxiv_search(kw: str, limit: int) -> list[Hit]:
+    budget.check("模式检索(arXiv)")  # 超预算立即中止
     query = " OR ".join(f"all:{w}" for w in kw.split())
     resp = None
     for attempt in range(3):  # arXiv域名间歇性阻断（README 2026-09实测记录），快速重试

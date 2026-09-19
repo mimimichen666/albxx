@@ -21,6 +21,7 @@ import pymupdf
 
 import llm_client
 import config
+import budget
 from models import PaperMeta, PaperCard
 
 # ---------------------------------------------------------------
@@ -103,6 +104,7 @@ def extract_card(paper: PaperMeta) -> PaperCard | None:
     返回:
         PaperCard 实例；解析失败返回None
     """
+    budget.check("提取Agent")  # 超预算立即中止（异常穿透线程池向上传播）
     print(f"[提取Agent] 正在处理: {paper.title[:50]}...")
 
     # 1. PDF → 全文
@@ -135,6 +137,8 @@ def extract_card(paper: PaperMeta) -> PaperCard | None:
         n_quotes = sum(len(c.quotes) for c in card.claims)
         print(f"[提取Agent] 完成: 提取{n_claims}条声明, {n_quotes}条原文引用")
         return card
+    except budget.BudgetExceededError:
+        raise  # 预算耗尽必须上抛终止流水线，不能按"单篇失败"吞掉
     except Exception as e:
         print(f"[提取Agent] 提取失败(跳过该论文): {e}")
         return None

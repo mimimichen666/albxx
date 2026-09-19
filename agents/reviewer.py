@@ -161,6 +161,7 @@ def run(papers: list[PaperMeta], cards: list[PaperCard]) -> list[ReviewResult]:
     def _verify_one(task):
         """单条声明的两级核验（工作线程函数，只读text_cache）"""
         card, idx, claim = task
+        budget.check("审查Agent")  # 超预算立即中止（异常穿透线程池上抛）
         full_text_norm = text_cache.get(card.arxiv_id, "")
 
         started = time.perf_counter()

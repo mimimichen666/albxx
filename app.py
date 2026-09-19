@@ -296,6 +296,9 @@ def run_pipeline(topic: str, target_count: int,
     from agents import planner, searcher, extractor, reviewer, synthesizer
     import llm_client
 
+    # ---- 全局时间预算: 从流水线开始计时，超预算在任意循环边界中止 ----
+    budget.start(config.GLOBAL_BUDGET_MIN)
+
     # ---- 1+2. 检索阶段（标准 / 三模式 两条路径；
     # 模式未命中先降级标准检索，降级后仍未命中才终止）----
     _use_mode = retrieval_mode in ("mode1", "mode2", "mode3")
@@ -306,6 +309,7 @@ def run_pipeline(topic: str, target_count: int,
 
         _mode_names = {"mode1": "🌱 入门综述", "mode2": "🚀 前沿突破",
                        "mode3": "🔀 交叉领域"}
+        st.session_state.pipeline_stage = "模式检索"  # 供失败时标注失败阶段
         status = st.status(
             f"🎯 {_mode_names[retrieval_mode]}模式检索: "
             "规划检索词+多库检索中...", expanded=True)
@@ -334,6 +338,7 @@ def run_pipeline(topic: str, target_count: int,
                       state="complete")
 
     # ---- 2. 检索Agent: PDF下载（两条路径共用下载与筛选收尾）----
+    st.session_state.pipeline_stage = "检索Agent(下载与筛选)"
     status = st.status("🔍 检索Agent: 下载论文PDF中（arXiv限速,约需1-3分钟）...",
                        expanded=True)
     if _use_mode:
@@ -412,6 +417,7 @@ def run_pipeline(topic: str, target_count: int,
                   state="complete")
 
     # ---- 7. 矛盾检测（方案三：学术争议发现）----
+    st.session_state.pipeline_stage = "矛盾检测"
     status = st.status("⚡ 矛盾检测: 在已核验声明间寻找学术争议...",
                        expanded=True)
     from agents import conflict_detector
@@ -481,14 +487,47 @@ with st.sidebar:
                          disabled=running,
                          help="运行中请耐心等待，重复点击会触发API限流"):
                 st.session_state.pipeline_running = True
+                _t_start = time.time()
                 try:
                     with st.spinner("流水线运行中..."):
                         run_pipeline(topic, target_count,
                                      _retrieval_mode, mode_years_sidebar)
+                except budget.BudgetExceededError as e:
+                    # 全局时间预算耗尽: 明确标注失败阶段，提示调大预算或换主题
+                    _stage = st.session_state.get("pipeline_stage") or e.stage
+                    st.session_state.last_failure = {
+                        "stage": _stage,
+                        "kind": "budget",
+                        "elapsed_min": (time.time() - _t_start) / 60,
+                        "error": f"全局时间预算({config.GLOBAL_BUDGET_MIN:.0f}分钟)耗尽",
+                    }
+                    st.error(f"⏰ 流水线在【{_stage}】阶段超时中止: "
+                             f"全局时间预算({config.GLOBAL_BUDGET_MIN:.0f}分钟)已耗尽。"
+                             "多为API限流退避叠加所致；可在.env调大GLOBAL_BUDGET_MIN"
+                             "或稍后重试（限流冷却后速度会恢复正常）")
+                except Exception as e:
+                    # 任意阶段异常: 记录并显示失败阶段（不再让网页裸抛堆栈）
+                    _stage = st.session_state.get("pipeline_stage") or "未知阶段"
+                    st.session_state.last_failure = {
+                        "stage": _stage,
+                        "kind": "error",
+                        "elapsed_min": (time.time() - _t_start) / 60,
+                        "error": str(e)[:300],
+                    }
+                    st.error(f"❌ 流水线在【{_stage}】阶段失败"
+                             f"(已运行{(time.time() - _t_start) / 60:.1f}分钟): {e}")
                 finally:
                     st.session_state.pipeline_running = False
         if running:
             st.info("⏳ 流水线正在执行中，请等待完成后再操作页面")
+
+    # ---- 上次运行的失败状态（rerun后仍然可见）----
+    _failure = st.session_state.get("last_failure")
+    if _failure:
+        _icon = "⏰" if _failure.get("kind") == "budget" else "❌"
+        st.warning(f"{_icon} 上次运行在【{_failure['stage']}】阶段失败"
+                   f"(运行{_failure.get('elapsed_min', 0):.1f}分钟): "
+                   f"{_failure.get('error', '')}")
     with col2:
         if st.button("📂 载入已有结果", use_container_width=True,
                      help="直接展示data/和output/目录下的历史产出"):

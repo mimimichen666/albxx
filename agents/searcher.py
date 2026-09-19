@@ -1284,6 +1284,7 @@ def _s2_request(params: dict, max_retries: int = 3,
         return None
 
     for attempt in range(max_retries):
+        budget.check("检索Agent(S2请求)")  # 超预算立即中止（含429退避等待前）
         try:
             _t0 = time.perf_counter()
             resp = requests.get(url or S2_API_BASE, params=params,
@@ -1537,6 +1538,7 @@ def search(plan: SearchPlan, results_per_query: int = 10) -> list[PaperMeta]:
     year_from = _parse_year_from(plan.inclusion_criteria)
 
     for kw in plan.keywords:
+        budget.check("检索Agent(关键词检索)")  # 每个检索词前检查全局预算
         print(f"[检索Agent] 正在检索: {kw} ...")
         kw_hit_ids = set()  # 本关键词命中的论文（用于跨关键词加成）
 
@@ -2084,6 +2086,7 @@ def download(papers: list[PaperMeta], max_workers: int = 3) -> list[PaperMeta]:
         print(f"[检索Agent] 主链接失败{len(failed)}篇，尝试arXiv救援...")
         time.sleep(2)  # 给arXiv API留间隔
         for p in failed:
+            budget.check("检索Agent(arXiv救援)")  # 超预算停止救援剩余论文
             if _arxiv_rescue(p):
                 downloaded.append(p)
 
