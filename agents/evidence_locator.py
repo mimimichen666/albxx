@@ -121,9 +121,11 @@ def render_evidence_page(pdf_path: str, page_num: int,
     """
     渲染指定页并高亮匹配文本
 
-    高亮实现: 在规范化文本上无法直接用search_for(原文带换行),
-    所以先在原始页面文本里定位匹配文本的"首词+尾词"锚点,
-    用search_for分别搜索锚点词组, 高亮两者之间的区域。
+    高亮实现（全段滑窗）:
+      旧版只高亮"首5词+尾5词"锚点, 长引用中间几行完全空白,
+      视觉上断成两截。现在把匹配文本按滑窗分块(块6词/步长3),
+      逐块search_for并收集矩形, 全段连续高亮; 滑窗重叠保证
+      块边界词也被覆盖。首块或尾块搜不到时逐词兜底。
 
     返回:
         True=渲染成功
@@ -131,40 +133,17 @@ def render_evidence_page(pdf_path: str, page_num: int,
     try:
         doc = fitz.open(pdf_path)
         page = doc[page_num]
-
-        # matched_text是规范化过的; 取首5词和尾5词作为原文锚点
         words = matched_text.split()
-        if len(words) >= 10:
-            head = " ".join(words[:5])
-            tail = " ".join(words[-5:])
-        else:
-            head = matched_text
-            tail = None
 
-        # search_for返回文本矩形(自动处理跨行)
-        head_rects = page.search_for(head)
-        if not head_rects:
-            # 锚点也断词了: 退化为逐词
-            head_words = head.split()
-            head_rects = []
-            for w in head_words:
-                head_rects += page.search_for(w)
-        if not head_rects:
+        rects = _collect_highlight_rects(page, words)
+        if not rects:
             doc.close()
             return False
 
-        highlight_rects = list(head_rects)
-
-        if tail:
-            tail_rects = page.search_for(tail)
-            if not tail_rects:
-                for w in tail.split():
-                    tail_rects += page.search_for(w)
-            highlight_rects += tail_rects
-
-        # 去重并添加高亮注释（黄色）
-        for rect in highlight_rects:
-            page.add_highlight_annot(rect)
+        # 单个注释携带全部矩形: PyMuPDF渲染为连续高亮带,
+        # 且按(y,x)排序保证注释内部矩形顺序与阅读顺序一致
+        rects.sort(key=lambda r: (round(r.y0, 1), r.x0))
+        page.add_highlight_annot(rects)
 
         # 渲染为图片（2倍缩放保证文字清晰）
         pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
@@ -175,6 +154,143 @@ def render_evidence_page(pdf_path: str, page_num: int,
     except Exception as e:
         print(f"[证据定位] 渲染失败 {pdf_path} p{page_num}: {e}")
         return False
+
+
+def _collect_highlight_rects(page, words: list[str]) -> list:
+    """收集整段高亮矩形: 词序列对齐(主) + search_for滑窗(备)"""
+    rects = _rects_by_word_alignment(page, words)
+    if rects:
+        return rects
+    return _rects_by_search_window(page, words)
+
+
+def _norm_word(w: str) -> str:
+    """词级归一化: 剥标点+小写(标点会干扰词匹配)"""
+    return w.strip(".,;:!?()[]\"'`").lower()
+
+
+# 逐词兜底时跳过的虚词: 孤立搜索这些词毫无定位价值,
+# 只会在全页产生大量无关高亮
+_STOP_WORDS = frozenset("""
+a an the of to in on for with and or is are was were be been being
+we our us it its this that these those as at by from not no but if
+then than so such can could may might will would should must have
+has had do does did over under between within into onto about above
+below out up down off
+""".split())
+
+
+def _rects_by_word_alignment(page, words: list[str]) -> list:
+    """主方案: 页面词序列滑窗对齐, 直接取命中词的bbox
+
+    用get_text("words")提取页面全部词+bbox, 与引用词序列做
+    窗口对齐取匹配率最高的位置。相比search_for滑窗:
+      - 斜体/特殊字体词不再搜索失败(实测improvement/existing
+        等斜体词search_for返回0矩形, 导致高亮缺口)
+      - 短词不再子串误命中(search_for("art")会命中"artificial",
+        词序列对齐受上下文约束不会)
+      - 每个命中词的bbox天然相邻, 整段高亮无缺口
+    """
+    if not words:
+        return []
+    q_words = [_norm_word(w) for w in words]  # 与words一一对应, 空串占位
+    n = len(q_words)
+
+    pw = page.get_text("words")  # [(x0,y0,x1,y1,word,block,line,no), ...]
+    p_words = [_norm_word(t[4]) for t in pw]
+    if len(p_words) < n:
+        return []
+
+    # 滑窗找匹配率最高的起点
+    best_s, best_m = -1, 0
+    for s in range(0, len(p_words) - n + 1):
+        m = sum(1 for i in range(n)
+                if q_words[i] and p_words[s + i] == q_words[i])
+        if m > best_m:
+            best_m, best_s = m, s
+    if best_s < 0 or best_m < max(2, int(n * 0.6)):
+        return []  # 匹配率过低视为未命中, 交由备用方案
+
+    # 只取匹配成功词的bbox(失配词可能是断行连字符拆分, 位置不可靠)
+    return [fitz.Rect(pw[best_s + i][:4]) for i in range(n)
+            if q_words[i] and p_words[best_s + i] == q_words[i]]
+
+
+def _rects_by_search_window(page, words: list[str]) -> list:
+    """备用方案: search_for滑窗分块搜索(处理词级对齐失败的情况)"""
+    if not words:
+        return []
+
+    rects: list = []
+
+    def _add_batch(found):
+        for r in found:
+            # 近似去重: 重叠滑窗块会产生同一词的细微差异矩形
+            # (y相差约1pt), 精确相等去重无法消除
+            if not any(abs(r.y0 - o.y0) < 2 and abs(r.x0 - o.x0) < 2
+                       for o in rects):
+                rects.append(r)
+
+    def _add_word_by_word(chunk_words, y_min=None, y_max=None):
+        """逐词兜底: 在页面词流中做全词精确匹配
+
+        不用search_for逐词搜: 它是子串匹配, "rot"会命中"rotate"的
+        前3字符, "of"会命中"profile"——产生无意义高亮。
+        改为页面词流全词相等比较:
+          - 虚词(of/the/an...)与过短词直接跳过
+          - y_min/y_max约束时只收集锚矩形附近的命中(避免同词
+            在页面其他位置的高亮混入)
+          - 无锚定时, 页面出现>=4次的词区分度太低, 直接放弃
+            (满页开花比高亮缺口更糟)
+        """
+        wanted = {_norm_word(w) for w in chunk_words}
+        pw = page.get_text("words")
+        p_norm = [_norm_word(t[4]) for t in pw]
+        freq = {}
+        for w in p_norm:
+            freq[w] = freq.get(w, 0) + 1
+        for t, w in zip(pw, p_norm):
+            if len(w) < 2 or w in _STOP_WORDS or w not in wanted:
+                continue
+            if y_min is not None:
+                if t[3] < y_min or t[1] > y_max:
+                    continue
+            elif freq[w] >= 4:
+                continue
+            r = fitz.Rect(t[:4])
+            if not any(r == o for o in rects):
+                rects.append(r)
+
+    if len(words) <= 8:
+        # 短文本: 词流全词匹配优先(无子串误命中, 虚词被过滤),
+        # 未命中再整句search_for(处理断行连字符拆词等词流失效场景)
+        _add_word_by_word(words)
+        if not rects:
+            _add_batch(page.search_for(" ".join(words)))
+        return rects
+
+    # 长文本: 滑窗分块
+    chunk, step = 6, 3
+    starts = list(range(0, len(words) - chunk + 1, step))
+    if starts[-1] != len(words) - chunk:
+        starts.append(len(words) - chunk)  # 末尾块对齐文末
+
+    for s in starts:
+        phrase = " ".join(words[s:s + chunk])
+        found = page.search_for(phrase)
+        if found:
+            _add_batch(found)
+        elif s == 0 or s == starts[-1]:
+            # 首块/末块失败: 逐词兜底(避免整段开头/结尾丢失)。
+            # 末块兜底时已有锚矩形, 限定在其附近±20pt(约一行)收集,
+            # 防止具体词(如state)在页面其他出现处被误高亮
+            if rects:
+                ys0 = min(r.y0 for r in rects)
+                ys1 = max(r.y1 for r in rects)
+                _add_word_by_word(words[s:s + chunk], ys0 - 20, ys1 + 20)
+            else:
+                _add_word_by_word(words[s:s + chunk])
+    return rects
 
 
 # ---------------------------------------------------------------
