@@ -90,14 +90,24 @@ def locate_quote(pdf_path: str, quote: str) -> tuple[int, str] | None:
 
     try:
         for page_num, page in enumerate(doc):
-            page_text = _norm_for_match(page.get_text())
+            # 页面文本与高亮渲染(_page_word_rects)用同一词序列构造,
+            # 保证"定位成功=>词对齐高亮必然命中"
+            page_text = " ".join(
+                t for t, _ in _page_word_rects(page))
             if quote_norm in page_text:
                 return page_num, quote_norm
 
-            # L2: 前缀匹配(前50字符命中即算——长引用可能跨页)
-            prefix = quote_norm[:50]
-            if len(quote_norm) > 60 and prefix in page_text:
-                return page_num, prefix
+            # L2: 前缀匹配(长引用可能跨页)。按词边界截前缀——
+            # 若按字符截断会把尾词切成半截, 词级高亮对不齐
+            if len(quote_norm) > 60:
+                prefix_words = quote_norm.split()
+                prefix = ""
+                for w in prefix_words:
+                    if len(prefix) + len(w) + 1 > 50 and prefix:
+                        break
+                    prefix = f"{prefix} {w}".strip()
+                if len(prefix.split()) >= 4 and prefix in page_text:
+                    return page_num, prefix
 
             # L3: 最长词组滑窗(从长到短尝试, 至少5词)
             words = quote_norm.split()
@@ -114,36 +124,105 @@ def locate_quote(pdf_path: str, quote: str) -> tuple[int, str] | None:
 
 
 # ---------------------------------------------------------------
-# 高亮渲染
+# 高亮渲染（词矩形精确对齐）
 # ---------------------------------------------------------------
+def _page_word_rects(page) -> list[tuple[str, object]]:
+    """
+    页面词序列(阅读顺序): [(规范化词, 矩形), ...]
+
+    连字符断词合并: "perfor-" + "mance" -> "performance"（矩形取并集），
+    与_norm_for_match的断词修复口径一致。
+    """
+    raw = page.get_text("words")  # 每项: [x0,y0,x1,y1,word,block,line,no]
+    items: list[tuple[str, object]] = []
+    prev: tuple[str, object] | None = None  # 以'-'结尾的待合并断词
+    for w in raw:
+        word = w[4]
+        rect = fitz.Rect(w[0], w[1], w[2], w[3])
+        if prev is not None:
+            # 前词以连字符结尾 + 当前词字母开头 -> 断词合并
+            if prev[0].endswith("-") and word[:1].isalpha():
+                items.append((prev[0][:-1] + word, prev[1] | rect))
+                prev = None
+                continue
+            items.append(prev)
+            prev = None
+        if word.endswith("-") and len(word) > 1 and word[:-1].isalpha():
+            prev = (word, rect)
+        else:
+            items.append((word, rect))
+    if prev is not None:
+        items.append(prev)
+    # 与locate_quote同一规范化口径（单词无空白，仅小写；保留标点）
+    return [(_norm_for_match(t), r) for t, r in items]
+
+
+def _find_word_span(page_words: list, target_words: list) -> tuple[int, int] | None:
+    """
+    在页面词序列中找目标词序列的连续匹配区间
+
+    返回:
+        (start, end) 词下标区间 或 None
+    """
+    n, m = len(page_words), len(target_words)
+    if m == 0 or n < m:
+        return None
+    first = target_words[0]
+    for s in range(n - m + 1):
+        if page_words[s][0] != first:
+            continue
+        if all(page_words[s + k][0] == target_words[k] for k in range(m)):
+            return s, s + m
+    return None
+
+
 def render_evidence_page(pdf_path: str, page_num: int,
                          matched_text: str, out_path: str) -> bool:
     """
     渲染指定页并高亮匹配文本
 
-    高亮实现（全段滑窗）:
-      旧版只高亮"首5词+尾5词"锚点, 长引用中间几行完全空白,
-      视觉上断成两截。现在把匹配文本按滑窗分块(块6词/步长3),
-      逐块search_for并收集矩形, 全段连续高亮; 滑窗重叠保证
-      块边界词也被覆盖。首块或尾块搜不到时逐词兜底。
+    高亮实现（三级降级, 词矩形精确对齐优先, 融合cbc分支与
+    review-agent-benchmark分支两版方案）:
+      L1 精确词段对齐: _page_word_rects构建词流(含连字符断词合并
+         perfor-⏎mance->performance, 矩形并集), _find_word_span定位
+         matched_text对应的连续词段——高亮的必然就是locate_quote
+         匹配到的那段原文, 物理上杜绝错位/误亮别处单词
+      L2 模糊滑窗对齐: matched_text与词流有细微差异(OCR噪声等)
+         导致L1失败时, 滑窗取匹配率>=0.6的最佳窗口, 只取命中词bbox
+      L3 search_for滑窗+全词兜底: 虚词过滤/多现词放弃, 最后防线
+      全部失败返回False(前端显示"无法定位", 绝不误亮)
 
     返回:
-        True=渲染成功
+        True=渲染成功; False=词对齐失败(前端显示"无法定位", 绝不误亮)
     """
     try:
         doc = fitz.open(pdf_path)
         page = doc[page_num]
-        words = matched_text.split()
-
-        rects = _collect_highlight_rects(page, words)
-        if not rects:
+        target_words = matched_text.split()
+        if not target_words:
             doc.close()
             return False
 
-        # 单个注释携带全部矩形: PyMuPDF渲染为连续高亮带,
-        # 且按(y,x)排序保证注释内部矩形顺序与阅读顺序一致
-        rects.sort(key=lambda r: (round(r.y0, 1), r.x0))
-        page.add_highlight_annot(rects)
+        page_words = _page_word_rects(page)
+        span = _find_word_span(page_words, target_words)
+        if span is not None:
+            s, e = span
+            rects = [page_words[i][1] for i in range(s, e)]
+        else:
+            # L2/L3: matched_text与词流有差异时的容错路径
+            rects = _rects_by_word_alignment(page, target_words, page_words)
+            if not rects:
+                rects = _rects_by_search_window(page, target_words)
+            if not rects:
+                print(f"[证据定位] 词对齐失败 p{page_num}: "
+                      f"{matched_text[:40]}...")
+                doc.close()
+                return False
+
+        # 同行且水平间隙小的相邻矩形合并为一条高亮带（美观+少注释;
+        # 双栏同行左右间距大, 不会误合）
+        for rect in _merge_line_rects(rects):
+            page.add_highlight_annot(rect)
 
         # 渲染为图片（2倍缩放保证文字清晰）
         pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
@@ -156,12 +235,27 @@ def render_evidence_page(pdf_path: str, page_num: int,
         return False
 
 
-def _collect_highlight_rects(page, words: list[str]) -> list:
-    """收集整段高亮矩形: 词序列对齐(主) + search_for滑窗(备)"""
-    rects = _rects_by_word_alignment(page, words)
-    if rects:
-        return rects
-    return _rects_by_search_window(page, words)
+def _merge_line_rects(rects: list) -> list:
+    """同行(y差<2)且水平间隙<=25pt的相邻矩形合并为高亮带
+
+    按阅读顺序(y,x)排序后线性合并; 合并基于矩形几何位置,
+    与矩形来源(L1词段/L2模糊对齐/L3兜底)无关。
+    """
+    rs = sorted(rects, key=lambda r: (round(r.y0, 1), r.x0))
+    out: list = []
+    cur = None
+    for r in rs:
+        if (cur is not None and abs(cur.y0 - r.y0) < 2
+                and abs(cur.y1 - r.y1) < 2
+                and 0 <= r.x0 - cur.x1 <= 25):
+            cur |= r
+        else:
+            if cur is not None:
+                out.append(cur)
+            cur = fitz.Rect(r)
+    if cur is not None:
+        out.append(cur)
+    return out
 
 
 def _norm_word(w: str) -> str:
@@ -180,24 +274,30 @@ below out up down off
 """.split())
 
 
-def _rects_by_word_alignment(page, words: list[str]) -> list:
-    """主方案: 页面词序列滑窗对齐, 直接取命中词的bbox
+def _rects_by_word_alignment(page, words: list[str],
+                             page_words: list | None = None) -> list:
+    """L2: 词序列滑窗模糊对齐, 取匹配率最高窗口的命中词bbox
 
-    用get_text("words")提取页面全部词+bbox, 与引用词序列做
-    窗口对齐取匹配率最高的位置。相比search_for滑窗:
-      - 斜体/特殊字体词不再搜索失败(实测improvement/existing
-        等斜体词search_for返回0矩形, 导致高亮缺口)
+    matched_text与词流存在细微差异(OCR噪声/断词合并遗漏等)导致
+    L1精确对齐失败时, 按60%匹配率兜底。相比search_for滑窗:
+      - 斜体/特殊字体词不再搜索失败(实测部分斜体词search_for
+        返回0矩形, 导致高亮缺口)
       - 短词不再子串误命中(search_for("art")会命中"artificial",
         词序列对齐受上下文约束不会)
       - 每个命中词的bbox天然相邻, 整段高亮无缺口
+
+    page_words: 预构建词流[(规范化词, 矩形)](来自_page_word_rects,
+    含断词合并); None时自建简易词流。
     """
     if not words:
         return []
     q_words = [_norm_word(w) for w in words]  # 与words一一对应, 空串占位
     n = len(q_words)
 
-    pw = page.get_text("words")  # [(x0,y0,x1,y1,word,block,line,no), ...]
-    p_words = [_norm_word(t[4]) for t in pw]
+    if page_words is None:
+        raw = page.get_text("words")
+        page_words = [(_norm_for_match(t[4]), fitz.Rect(t[:4])) for t in raw]
+    p_words = [_norm_word(w) for w, _ in page_words]
     if len(p_words) < n:
         return []
 
@@ -211,8 +311,8 @@ def _rects_by_word_alignment(page, words: list[str]) -> list:
     if best_s < 0 or best_m < max(2, int(n * 0.6)):
         return []  # 匹配率过低视为未命中, 交由备用方案
 
-    # 只取匹配成功词的bbox(失配词可能是断行连字符拆分, 位置不可靠)
-    return [fitz.Rect(pw[best_s + i][:4]) for i in range(n)
+    # 只取匹配成功词的bbox(失配词位置不可靠, 丢弃避免错位高亮)
+    return [page_words[best_s + i][1] for i in range(n)
             if q_words[i] and p_words[best_s + i] == q_words[i]]
 
 
