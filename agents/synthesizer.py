@@ -28,10 +28,6 @@ from models import PaperMeta, PaperCard, ReviewResult
 # 产出目录
 OUTPUT_DIR = os.path.join(config.PROJECT_ROOT, "output")
 
-# Semantic Scholar 引用关系API（拿"本文引用了谁"）
-S2_REF_API = "https://api.semanticscholar.org/graph/v1/paper/arXiv:{arxiv_id}/references"
-S2_REF_FIELDS = "title,externalIds"
-
 
 # ---------------------------------------------------------------
 # 工具：加载前三步的产出
@@ -123,37 +119,34 @@ def build_table(cards: list[PaperCard],
 # ---------------------------------------------------------------
 # 产出2：引用图谱
 # ---------------------------------------------------------------
-def _fetch_references(arxiv_id: str, max_retries: int = 3) -> list[str]:
+def _fetch_references(paper: "PaperMeta") -> list[str]:
     """
-    从Semantic Scholar获取某论文的参考文献标题列表
+    获取一篇论文的参考文献列表（W-ID格式），双通道与检索阶段同构:
+
+    主通道  OpenAlex referenced_works——免费无额度限制、W-ID直取、
+           走7天缓存(检索阶段引用链挖掘已拉过的直接秒回);
+           SLAYER式"高被引主记录无参考文献"的数据坑由
+           _seed_references内置的标题反查重复记录兜底
+    兜底通道  S2按标题match解析W-ID(0.85相似度门限)+熔断器+
+             MAG/arXiv-DOI双路ID映射(75%覆盖率)——OpenAlex缺
+             引用数据或无openalex_id的论文才走S2
+
+    2026-10-25修复(外部被引论文不显示): 旧实现裸调S2的
+    arXiv:{id}/references端点——W-ID论文塞进arXiv端点必然404、
+    无熔断器匿名限流时3×30s全超时、无缓存重复消耗配额，
+    三重缺陷叠加导致边数0→降级二部图(灰色外部被引节点消失)
 
     返回:
-        引用论文的arXiv id列表（只保留同样是arXiv论文的引用，便于构图）;
-        网络失败返回空列表（触发降级方案）
+        引用论文的W-ID列表; 失败返回空列表（触发降级方案）
     """
-    headers = {"x-api-key": config.S2_API_KEY} if config.S2_API_KEY else {}
-    for attempt in range(max_retries):
-        try:
-            resp = requests.get(
-                S2_REF_API.format(arxiv_id=arxiv_id),
-                params={"fields": S2_REF_FIELDS, "limit": 50},
-                headers=headers, timeout=30,
-            )
-            if resp.status_code == 429:
-                time.sleep(10 * (attempt + 1))
-                continue
-            resp.raise_for_status()
-            data = resp.json()
-            ref_ids = []
-            for item in data.get("data", []):
-                ref_paper = item.get("citedPaper", {})
-                ref_arxiv = (ref_paper.get("externalIds") or {}).get("ArXiv")
-                if ref_arxiv:
-                    ref_ids.append(ref_arxiv)
-            return ref_ids
-        except Exception:
-            time.sleep(3)
-    return []
+    from agents import searcher as _searcher
+    # 主通道: OpenAlex（有openalex_id且主记录有引用数据时秒回）
+    if getattr(paper, "openalex_id", ""):
+        refs = _searcher._seed_references(paper)
+        if refs:
+            return refs
+    # 兜底通道: S2（W-ID论文标题解析 / OpenAlex缺参考文献数据）
+    return _searcher._s2_references_as_wids(paper)
 
 
 def build_graph(papers: list[PaperMeta],
@@ -173,31 +166,62 @@ def build_graph(papers: list[PaperMeta],
     graph_mode = "引用关系图"
 
     # 我们自己的论文集合（用于识别"内部互引"并高亮）
+    # ID对齐: 引用列表返回W-ID格式，互引判定需把检索集论文的
+    # arXiv编号与W-ID两种格式都收进集合（同一篇论文两个"名字"）
     our_ids = {p.arxiv_id for p in papers}
-    title_by_id = {p.arxiv_id: p.title for p in papers}
-    year_by_id = {p.arxiv_id: p.year for p in papers}
+    our_ids |= {p.openalex_id for p in papers if getattr(p, "openalex_id", "")}
+
+    # 标题/年份索引: 同一篇论文的arXiv编号与W-ID两种key都指向同一元数据
+    # （内部互引边的target可能是W-ID形式,取title时两种key都要能查到）
+    title_by_id: dict[str, str] = {}
+    year_by_id: dict[str, int] = {}
+    for p in papers:
+        title_by_id[p.arxiv_id] = p.title
+        year_by_id[p.arxiv_id] = p.year
+        if getattr(p, "openalex_id", ""):
+            title_by_id[p.openalex_id] = p.title
+            year_by_id[p.openalex_id] = p.year
 
     # ---- 尝试真实引用关系（并行获取，串行需每篇1秒间隔+请求耗时）----
     from concurrent.futures import ThreadPoolExecutor
     # 2026-10-15: 3→6线程(S2引用数据拉取, 多数场景走缓存秒回)
     with ThreadPoolExecutor(max_workers=6) as executor:
         # 并行拉取所有论文的参考文献列表（保持与papers相同的顺序）
-        all_refs = list(executor.map(lambda p: _fetch_references(p.arxiv_id),
-                                     papers))
+        # 2026-10-25: 传paper对象——W-ID论文需标题解析,见_fetch_references
+        all_refs = list(executor.map(_fetch_references, papers))
+
+    # ---- 显式添加检索论文节点（2026-10-25修复"只有一篇绿节点"）----
+    # 旧逻辑绿节点只随边间接产生: 外部边配额被第一篇吃光后，其余
+    # 论文没有任何边进图，节点就不存在——页面上只剩一篇已检索论文
+    for p in papers:
+        G.add_node(p.arxiv_id)
 
     ref_edges = 0
+    # 外部边双限额（2026-10-25: 全局40改每篇10+总量40）:
+    # 旧全局配额下第一篇refs最多的论文独占40条,其余论文外部引用
+    # 全部被挤掉; 每篇限额保证每篇论文都有外部引用展示
+    MAX_EXTERNAL_TOTAL = 40      # 总量上限，防图爆炸
+    MAX_EXTERNAL_PER_PAPER = 10  # 每篇限额，保证展示均衡
+    ext_by_paper: dict[str, int] = {}
+    # W-ID→arXiv编号别名映射: 检索集论文互引边的target统一指向
+    # 其绿节点主键(p.arxiv_id),否则网络库会自动建出"分身绿节点"
+    wid_to_arxiv = {p.openalex_id: p.arxiv_id
+                    for p in papers if getattr(p, "openalex_id", "")}
     for p, refs in zip(papers, all_refs):
         if not refs:
             continue  # 单篇失败不影响其他
         for ref_id in refs:
+            ref_id = wid_to_arxiv.get(ref_id, ref_id)  # 归一到arXiv主键
             if ref_id == p.arxiv_id:
                 continue
             if ref_id in our_ids:
                 # 内部互引：最有分析价值（谁引用了同批检索到的论文）
                 G.add_edge(p.arxiv_id, ref_id, kind="internal")
                 ref_edges += 1
-            elif ref_edges < 40:  # 外部引用限量，防止图爆炸
+            elif (ext_by_paper.get(p.arxiv_id, 0) < MAX_EXTERNAL_PER_PAPER
+                  and ref_edges < MAX_EXTERNAL_TOTAL):
                 G.add_edge(p.arxiv_id, ref_id, kind="external")
+                ext_by_paper[p.arxiv_id] = ext_by_paper.get(p.arxiv_id, 0) + 1
                 ref_edges += 1
 
     # ---- 降级方案：论文-方法分类二部图 ----

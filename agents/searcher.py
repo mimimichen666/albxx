@@ -2231,7 +2231,12 @@ def _composite_sort(papers: list[PaperMeta]) -> list[PaperMeta]:
     if not papers:
         return papers
     max_rrf = max(p.rrf_score for p in papers) or 1.0
-    max_cited = max(p.cited_by for p in papers)
+    # 影响力基准截断(2026-10-25修复): 引用链挖回的跨领域通用论文
+    # (ResNet被引23万/VGG/Adam)会把max_cited拉爆——领域内经典
+    # (SLAYER被引605)归一化后仅0.52,综合分被压制,终选top_k被
+    # 通用论文霸榜挤掉。被引5000已是任何领域的顶级经典,超过的
+    # 部分不再携带领域相关性信息——以5000为归一化基准截断
+    max_cited = min(max(p.cited_by for p in papers), 5000)
     max_chain = max(p.chain_hits for p in papers)
     for p in papers:
         rrf_norm = p.rrf_score / max_rrf  # 0~1
