@@ -45,6 +45,7 @@ TTL_SECONDS = 7 * 86400  # 缓存有效期：7天（论文元数据变化极慢�
 LLM_TTL_SECONDS = 30 * 86400
 
 _LOCK = threading.Lock()   # 保护连接的写操作（多线程并发安全）
+_INIT_LOCK = threading.Lock()  # 保护首次初始化（防止并发建连接竞态）
 _CONN: sqlite3.Connection | None = None  # 惰性初始化的连接
 
 
@@ -52,33 +53,40 @@ def _init() -> sqlite3.Connection:
     """惰性初始化数据库连接和表结构（首次调用时执行）"""
     global _CONN
     if _CONN is None:
-        os.makedirs(os.path.dirname(_DB_PATH), exist_ok=True)
-        # check_same_thread=False: 允许多线程共用连接（写操作有锁保护）
-        _CONN = sqlite3.connect(_DB_PATH, check_same_thread=False)
-        _CONN.execute("""CREATE TABLE IF NOT EXISTS cache(
-            key     TEXT PRIMARY KEY,   -- 请求指纹(SHA1)
-            ts      REAL,               -- 写入时间戳（判断过期）
-            payload TEXT                -- 原始JSON响应（仅200成功响应）
-        )""")
-        # 请求日志表（任务4慢查询诊断的数据源）
-        _CONN.execute("""CREATE TABLE IF NOT EXISTS req_log(
-            ts         REAL,            -- 请求时间戳
-            source     TEXT,            -- openalex / s2 / crossref / llm...
-            key_prefix TEXT,            -- 请求指纹前16位（排查用）
-            ms         REAL,            -- 耗时（毫秒）
-            status     TEXT,            -- ok / 429 / 5xx / error / expired
-            from_cache INTEGER          -- 1=缓存命中 0=真实网络请求
-        )""")
-        # LLM结果缓存表（2026-09新增）：
-        # 提取/审查/规划等结构化LLM调用的返回值按"消息指纹"缓存。
-        # 与HTTP缓存分表的原因：TTL不同（30天 vs 7天），
-        # 且诊断时想把"LLM命中"与"检索命中"分开统计
-        _CONN.execute("""CREATE TABLE IF NOT EXISTS llm_cache(
-            key     TEXT PRIMARY KEY,   -- 消息指纹(SHA1)
-            ts      REAL,               -- 写入时间戳（判断过期）
-            payload TEXT                -- LLM原始输出文本
-        )""")
-        _CONN.commit()
+        # 2026-10-25修复: 多线程首次并发调用时,两个线程同时通过
+        # None检查会各建一个连接互相覆盖,被覆盖的连接在GC/并发
+        # 使用下抛sqlite3.OperationalError(not an error)——
+        # 图谱的6线程引用拉取在冷启动时必现。double-checked
+        # locking: 拿到_INIT_LOCK后再确认一次None
+        with _INIT_LOCK:
+            if _CONN is None:
+                os.makedirs(os.path.dirname(_DB_PATH), exist_ok=True)
+                # check_same_thread=False: 允许多线程共用连接（写操作有锁保护）
+                _CONN = sqlite3.connect(_DB_PATH, check_same_thread=False)
+                _CONN.execute("""CREATE TABLE IF NOT EXISTS cache(
+                    key     TEXT PRIMARY KEY,   -- 请求指纹(SHA1)
+                    ts      REAL,               -- 写入时间戳（判断过期）
+                    payload TEXT                -- 原始JSON响应（仅200成功响应）
+                )""")
+                # 请求日志表（任务4慢查询诊断的数据源）
+                _CONN.execute("""CREATE TABLE IF NOT EXISTS req_log(
+                    ts         REAL,            -- 请求时间戳
+                    source     TEXT,            -- openalex / s2 / crossref / llm...
+                    key_prefix TEXT,            -- 请求指纹前16位（排查用）
+                    ms         REAL,            -- 耗时（毫秒）
+                    status     TEXT,            -- ok / 429 / 5xx / error / expired
+                    from_cache INTEGER          -- 1=缓存命中 0=真实网络请求
+                )""")
+                # LLM结果缓存表（2026-09新增）：
+                # 提取/审查/规划等结构化LLM调用的返回值按"消息指纹"缓存。
+                # 与HTTP缓存分表的原因：TTL不同（30天 vs 7天），
+                # 且诊断时想把"LLM命中"与"检索命中"分开统计
+                _CONN.execute("""CREATE TABLE IF NOT EXISTS llm_cache(
+                    key     TEXT PRIMARY KEY,   -- 消息指纹(SHA1)
+                    ts      REAL,               -- 写入时间戳（判断过期）
+                    payload TEXT                -- LLM原始输出文本
+                )""")
+                _CONN.commit()
     return _CONN
 
 
