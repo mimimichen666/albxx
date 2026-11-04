@@ -329,6 +329,25 @@ def _read_status() -> dict:
 _PID_FILE = os.path.join(config.DATA_DIR, "pipeline.pid")
 
 
+def _run_meta() -> dict:
+    """最近一次流水线运行的元数据(worker启动时落盘): 记录fast/deep模式"""
+    try:
+        with open(os.path.join(config.DATA_DIR, "run_meta.json"),
+                  encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _chain_display(chain_hits) -> str:
+    """引用链列的显示: 快速模式跳过了引用链挖掘, chain_hits恒为默认0
+    ——直接显示0会误导用户以为'挖过了但没有链'。此处按运行模式区分:
+    快速模式显示'未挖掘(快速模式)', 深度模式如实显示数字。"""
+    if not chain_hits and _run_meta().get("fast"):
+        return "未挖掘(快速模式)"
+    return str(chain_hits)
+
+
 def _alive_worker_pid():
     """返回正在运行的worker进程PID(没有则None)。
     页面刷新后session_state清零、进程句柄丢失, PID文件是跨会话判断
@@ -656,6 +675,10 @@ with st.sidebar:
     with col2:
         if st.button("📂 载入已有结果", use_container_width=True,
                      help="直接展示data/和output/目录下的历史产出"):
+            # 先清数据缓存再载入——外部方式(命令行worker/队友运行)落盘的
+            # 新结果, st.cache_data会命中旧读取, 导致页面一直显示旧数据
+            load_json.clear()
+            load_text.clear()
             st.session_state.pipeline_done = True
 
     st.divider()
@@ -1075,7 +1098,7 @@ with tab0:
 
             score_parts = (
                 f"相关性 {p.relevance_score if p.relevance_score is not None else '免检'}"
-                f" · 被引 {p.cited_by} · 引用链 {p.chain_hits}"
+                f" · 被引 {p.cited_by} · 引用链 {_chain_display(p.chain_hits)}"
                 + (f" · 综合分 {p.final_score}" if p.final_score else "")
             )
             with st.expander(
