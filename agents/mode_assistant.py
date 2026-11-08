@@ -103,11 +103,20 @@ QUERY_PLAN_SYSTEM = """你是学术检索规划专家，把用户的中文/英�
 规则:
 1. keywords: 3-4组英文检索词，每组2-4个空格分隔的标准英文术语，覆盖主题不同角度。
    必须使用领域规范英文术语（如"脉冲神经网络"是spiking neural network而不是pulse neural network）。
-2. combined_keywords（仅交叉模式需要）: 2-3组组合英文检索词，每组格式为
+   严禁在检索词中出现年份或年份区间（如"2024"或"2020-2023"）——时间范围由检索API的
+   年份参数控制，检索词带年份会把召回偏向旧的综述类论文。
+2. 严禁泛化后缀词（如"recent advancements""development""progress""machine learning
+   in X"这类空洞组合）——检索AND组合下泛词几乎不缩小范围，最新提交的无关论文
+   都会混入。每组词都必须包含主题的核心实体词或其领域同义词
+   （如主题AlphaGo可扩展为: AlphaGo / AlphaZero / self-play Monte Carlo tree search /
+   game-playing reinforcement learning Go）。
+   同组检索词必须是空格分隔的纯英文单词——严禁用斜杠/竖线在同一组词里罗列
+   同义词（如"AlphaGo / AlphaZero"），同义词请拆成多组，斜杠会污染检索API查询。
+3. combined_keywords（仅交叉模式需要）: 2-3组组合英文检索词，每组格式为
    「A领域英文短语+B领域英文短语」——用加号+分隔两个领域的核心短语，
    如"large language model+industrial control""retrieval augmented generation+
    operational technology security"。同时把识别出的两个领域写入domains（中文）。
-3. 非交叉模式: combined_keywords和domains留空数组。"""
+4. 非交叉模式: combined_keywords和domains留空数组。"""
 
 # ================================================================
 # 三、检索工具（每源一个轻量封装，均带优雅降级）
@@ -378,16 +387,20 @@ def _arxiv_search_html(kw: str, limit: int) -> list[Hit]:
     return hits
 
 
-def _arxiv_search(kw: str, limit: int) -> list[Hit]:
+def _arxiv_search(kw: str, limit: int, sort: str = "relevance") -> list[Hit]:
     budget.check("模式检索(arXiv)")  # 超预算立即中止
-    query = " OR ".join(f"all:{w}" for w in kw.split())
+    # AND语义: OR会把"Go AI development"变成"含ai即命中"——
+    # 2026-11-08实测捞回AI4Math/光纤/Ramsey数等最新不相关论文的根因
+    query = " AND ".join(f"all:{w}" for w in kw.split())
     resp = None
     for attempt in range(3):  # arXiv域名间歇性阻断（README 2026-09实测记录），快速重试
         try:
             resp = requests.get(ARXIV_API_BASE, params={
                 "search_query": query,
                 "max_results": min(limit, 15),
-                "sortBy": "relevance",
+                "sortBy": sort,
+                # 前沿模式按提交日期降序(submittedDate)时必须显式给排序方向
+                "sortOrder": "descending" if sort == "submittedDate" else "ascending",
             }, timeout=30)
             resp.raise_for_status()
             break
@@ -448,11 +461,20 @@ def build_query_plan(query: str, mode: str) -> ModeQueryPlan:
         "mode2": "前沿突破检索模式（检索近1-3年顶刊顶会最新成果）",
         "mode3": "交叉领域检索模式（主题横跨两个领域，组合关键词精准定位融合研究）",
     }[mode]
-    return llm_client.chat_json(
+    plan = llm_client.chat_json(
         [{"role": "system", "content": QUERY_PLAN_SYSTEM},
          {"role": "user", "content": f"检索需求: {query}\n检索模式: {desc}"}],
         schema_class=ModeQueryPlan, temperature=0.4,
     )
+    # 防御性清洗: LLM偶尔违规用斜杠在同一组词里罗列同义词
+    # （如"AlphaGo / AlphaZero"），斜杠进入arXiv查询变成all:/导致请求失败
+    # ——拆成独立组兜底（combined_keywords的"+"是协议分隔符,不动）
+    cleaned: list[str] = []
+    for kw in plan.keywords:
+        parts = [p.strip() for p in re.split(r"\s*/\s*", kw) if p.strip()]
+        cleaned.extend(parts if len(parts) > 1 else [kw])
+    plan.keywords = cleaned[:5]
+    return plan
 
 
 # ================================================================
@@ -514,32 +536,97 @@ def _retrieve_mode1(plan: ModeQueryPlan) -> tuple[list[Hit], list[SourceStatus]]
 
 def _retrieve_mode2(plan: ModeQueryPlan,
                     years: int) -> tuple[list[Hit], list[SourceStatus]]:
-    """模式2: 近N年最新突破（S2年份过滤 + OpenAlex，时间+影响力双排序）"""
-    year_from = datetime.date.today().year - years + 1
-    s2_all, oa_all = [], []
-    for kw in plan.keywords[:3]:
-        s2_all.extend(_s2_search(kw, 10, year_from=year_from))
-    for kw in plan.keywords[:2]:
-        oa_all.extend(_oa_search(kw, 10, year_from=year_from,
-                                 source_type="期刊论文"))
+    """
+    模式2: 近N年最新突破（2026-11-08 alphago跑偏复盘重构）
 
-    hits = _dedup([h for h in s2_all + oa_all if h.abstract])
+    旧版问题: ①OpenAlex用默认被引排序——年份窗口内2026新论文被引≈0,
+    排序近似随机,捞回HIV/气候等泛OA论文; ②arXiv(预印本=前沿主战场)
+    仅作限流应急且按relevance排序; ③years=1窗口太窄,候选枯竭时凑数。
 
-    # S2+OpenAlex双双不可达（429限流）→ arXiv应急（预印本本就是
-    # 最新突破的典型载体；年份近N年过滤，命中为空时放宽到全部年份）
-    arx_status = None
-    if not hits:
+    新版四项优化:
+      1. arXiv升为主源,按submittedDate降序——直接抓该主题最新提交预印本
+      2. OpenAlex改relevance_score排序(窗口内被引数无区分度)
+      3. 年份分层放宽: 窗口内命中不足(<8篇)自动放宽1年再搜,最多放宽2年
+         (mode2定位"近1-3年",years=1时最多扩到3年,符合模式描述)
+      4. 词面预过滤: 命中标题/摘要须包含至少一个检索词词根,
+         拦截"learning"级别弱匹配(HIV论文含deep learning即命中的根因)
+    """
+    today_year = datetime.date.today().year
+    s2_all: list[Hit] = []
+    oa_all: list[Hit] = []
+    arx_all: list[Hit] = []
+
+    # 词面预过滤的弱词表: 这些词过于通用(几乎任何AI论文摘要都有),
+    # 单独命中不构成主题相关证据——HIV论文摘要含"deep learning"
+    # 即命中alphago检索词的根因。只有强词(如alphago/self-play/
+    # monte)才算命中; 词全为弱词时退化为弱词匹配(保底不空转)
+    _WEAK_WORDS = {
+        "learning", "model", "models", "network", "networks", "neural",
+        "deep", "data", "analysis", "approach", "method", "methods",
+        "study", "based", "using", "novel", "framework", "system",
+        "systems", "application", "applications", "performance",
+        "algorithm", "algorithms", "optimization", "prediction",
+        "tree", "search", "game", "games", "playing", "toward",
+        "towards", "review", "survey", "research", "science",
+        # 2026-11-08第二版补充: "recent/advancements/progress"这类
+        # 泛化词单独命中无意义(几乎任何论文摘要都含), 须与主题实体词
+        # 同现才算证据——LLM规划出"Go AI development"时机器/进展等
+        # 词不应构成命中依据
+        "recent", "advancements", "advances", "advance", "progress",
+        "development", "developments", "machine", "intelligence",
+        "artificial", "frontier", "latest", "emerging", "breakthrough",
+        "future", "trends", "trend", "improvement", "improvements",
+        "enhancement", "enhancements", "general", "new",
+    }
+
+    # 分层放宽窗口: 命中不足时自动放宽1年(最多2年)
+    for widen in range(3):
+        year_from = today_year - years + 1 - widen
+        year_floor = str(year_from)
+
+        # 词面预过滤: 标题/摘要须包含至少一个强词根(弱词不计数,
+        # 长度>=4过滤of/the等虚词); 完整词边界匹配——防止"alpha"
+        # 子串命中"AlphaFold"这类泛匹配(上一轮11篇弱相关混入的根因)
+        def _word_hit(h: Hit, kws: list[str]) -> bool:
+            text = (h.title + " " + h.abstract).lower()
+            words = [w.lower() for kw in kws for w in kw.split()
+                     if len(w) >= 4]
+            strong = [w for w in words if w not in _WEAK_WORDS]
+            probe = strong or words
+            return any(re.search(rf"\b{re.escape(w)}\b", text)
+                       for w in probe)
+
+        kws = plan.keywords[:3]
+
+        # 源1: Semantic Scholar（严格年份参数,相关性排序）
+        s2_all = []
+        for kw in kws:
+            s2_all.extend(_s2_search(kw, 10, year_from=year_from))
+
+        # 源2: OpenAlex（relevance排序——窗口内被引数无区分度）
+        oa_all = []
+        for kw in plan.keywords[:2]:
+            oa_all.extend(_oa_search(kw, 10, year_from=year_from,
+                                     source_type="期刊论文",
+                                     sort="relevance_score:desc"))
+
+        # 源3: arXiv主源（submittedDate降序=最新提交优先）
         arx_all = []
         for kw in plan.keywords[:2]:
-            arx_all.extend(_arxiv_search(kw, 8))
-        cand = [h for h in arx_all
-                if (h.pub_date or str(h.year or ""))[:4] >= str(year_from)]
-        hits = _dedup(cand or arx_all)
-        if hits:
-            arx_status = SourceStatus(
-                name=f"预印本({years}年内,应急)", api="arXiv(主站HTML兜底)",
-                ok=True, count=len(hits),
-                note="S2/OpenAlex限流期间的应急源")
+            arx_all.extend(_arxiv_search(kw, 10, sort="submittedDate"))
+        arx_all = [h for h in arx_all
+                   if (h.pub_date or str(h.year or "0000"))[:4] >= year_floor]
+
+        # 词面预过滤（各源分别应用,防弱匹配污染）
+        s2_all = [h for h in s2_all if _word_hit(h, kws)]
+        oa_all = [h for h in oa_all if _word_hit(h, kws)]
+        arx_all = [h for h in arx_all if _word_hit(h, kws)]
+
+        hits = _dedup([h for h in s2_all + oa_all + arx_all if h.abstract])
+        if len(hits) >= 8:
+            break
+        print(f"[模式检索] 前沿窗口{year_floor}后命中仅{len(hits)}篇,"
+              f"放宽1年继续(最多放宽2年)")
 
     # 「发表时间+学术影响力」双重排序: 先比精确发表日期，同日比被引
     hits.sort(key=lambda h: (h.pub_date or str(h.year or ""), h.cited_by),
@@ -548,15 +635,16 @@ def _retrieve_mode2(plan: ModeQueryPlan,
     _apply_badges(hits, high_cited=30)  # 近年成果被引门槛降低
 
     statuses = [
+        SourceStatus(name=f"预印本(最新提交)", api="arXiv(submittedDate降序)",
+                     ok=bool(arx_all), count=len(arx_all),
+                     note="前沿主源: 按提交日期抓最新" if arx_all else "arXiv不可达或无命中"),
         SourceStatus(name=f"期刊/会议论文({years}年内)", api="Semantic Scholar",
                      ok=bool(s2_all), count=len(s2_all),
                      note="" if s2_all else "S2不可达或无命中"),
         SourceStatus(name=f"期刊/会议论文({years}年内,补充)", api="OpenAlex",
                      ok=bool(oa_all), count=len(oa_all),
-                     note="" if oa_all else "OpenAlex不可达或无命中"),
+                     note="已切换relevance排序" if oa_all else "OpenAlex不可达或无命中"),
     ]
-    if arx_status:
-        statuses.append(arx_status)
     return hits, statuses
 
 
@@ -681,6 +769,74 @@ def generate_glossary(papers: list, topic: str = "") -> str | None:
 
 
 # ================================================================
+# 六·五、批量LLM相关性门（前沿模式专用防线）
+# ================================================================
+class RelVerdicts(BaseModel):
+    """批量相关性判定（与候选按下标顺序一一对应）"""
+    verdicts: list[str] = Field(
+        description="每篇候选的判定,只能取keep(与主题直接相关)或"
+                    "drop(泛匹配/弱相关/仅提及主题术语),顺序与输入一致",
+        min_length=1)
+
+
+def filter_hits_by_topic(hits: list[Hit], query: str) -> list[Hit]:
+    """
+    批量LLM相关性门——拦截年份窗口内"词面泛匹配"的无关论文。
+
+    背景(alphago跑偏复盘): mode2的窗口内候选经过词面预过滤后仍可能
+    混入"摘要里提到deep learning但主题完全无关"的论文(HIV/气候等),
+    三模式检索不像标准模式那样有filter_papers相关性筛选,这里补上。
+
+    设计约束:
+      - 恒定1次LLM调用(全部候选一次判定,对比逐篇筛选省一个数量级成本)
+      - 判定标准从严: 论文核心研究对象必须是主题本身或其直接子问题,
+        "仅提到术语"判drop
+      - 全部drop时如实返回空列表——2026-11-08复盘: 旧版"全drop保底返回
+        原列表"会把正确拦截撤销,让12篇最新不相关论文全数放行。真相是
+        全drop=该模式下确实没有相关论文,返回空后pipeline_worker会自动
+        降级标准检索(标准检索有filter_papers质量体系),比放行垃圾安全
+      - 失败容错: LLM不可达/输出畸形/输出不齐时保留——
+        过滤层绝不引入新故障点
+    """
+    if not hits or not query:
+        return hits
+    src = "\n".join(f"[{i}] 标题: {h.title}\n"
+                    f"    摘要片段: {(h.abstract or '')[:200]}"
+                    for i, h in enumerate(hits, 1))
+    try:
+        v = llm_client.chat_json(
+            [{"role": "system",
+              "content": "你是学术检索的相关性审核员。给定一个研究主题和一批"
+                         "候选论文(标题+摘要片段),逐篇判定该论文是否与主题"
+                         "直接相关。判定标准: 论文的核心研究对象必须就是该主题"
+                         "(或其直接子问题/直接后续工作/直接应用)；"
+                         "仅在摘要中提到过相关术语而研究本身无关的,判drop。"},
+             {"role": "user",
+              "content": f"研究主题: {query}\n\n候选论文:\n{src}\n\n"
+                         "请输出每篇的判定(keep/drop)，与编号顺序严格一致。"}],
+            schema_class=RelVerdicts, temperature=0.0)
+        verdicts = [str(x).strip().lower() for x in (v.verdicts or [])]
+    except Exception as e:
+        print(f"[模式检索] 相关性门调用失败,全部保留(容错): {e}")
+        return hits
+
+    if len(verdicts) < len(hits):
+        print(f"[模式检索] 相关性门输出不齐({len(verdicts)}/{len(hits)}),"
+              "缺失部分保留")
+    if not any(v in ("keep", "drop") for v in verdicts):
+        # 输出畸形(既无keep也无drop) → 视同调用失败,容错保留
+        print("[模式检索] 相关性门输出畸形,全部保留(容错)")
+        return hits
+    kept = [h for i, h in enumerate(hits)
+            if i >= len(verdicts) or verdicts[i] == "keep"]
+    dropped = len(hits) - len(kept)
+    print(f"[模式检索] 相关性门拦截{dropped}篇泛匹配候选"
+          + ("（全drop: 该模式下确无相关论文,流水线将降级标准检索）"
+             if not kept else ""))
+    return kept
+
+
+# ================================================================
 # 七、完整流水线桥接（三模式检索作为流水线的检索阶段）
 # ================================================================
 _ARXIV_ID_PAT = re.compile(r"arxiv\.org/(?:abs|pdf)/([0-9]{4}\.[0-9]{4,5})")
@@ -737,6 +893,10 @@ def retrieve_for_pipeline(query: str, mode: str, years: int = 2,
         hits, _ = _retrieve_mode1(plan)
     elif mode == "mode2":
         hits, _ = _retrieve_mode2(plan, years)
+        # 前沿模式相关性门: 词面预过滤后仍可能混入"摘要里仅提及术语"
+        # 的无关论文（如检索alphago混入 HIV/气候 类论文），用LLM批量
+        # 复核一次（恒定1次调用），把核心研究对象不是主题的候选拦下
+        hits = filter_hits_by_topic(hits, query)
     else:
         hits, _ = _retrieve_mode3(plan)
 

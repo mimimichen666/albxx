@@ -1722,6 +1722,25 @@ with tabS:
     _sv_file = os.path.join(config.OUTPUT_DIR, "survey_summary.md")
     _sv_md = load_text(_sv_file)
 
+    # 过期检测: 综述总结是手动生成的持久文件,不会随新流水线运行自动清除
+    # (综合Agent只重写final_report/review_table/citation_graph)。
+    # 比较其文件修改时间与当前运行(run_meta.json)的完成时间——
+    # 若综述总结早于本次运行,它描述的还是上一次检索的内容,提示重新生成。
+    _sv_stale, _run_ts, _run_topic = False, "", ""
+    try:
+        _meta_path = os.path.join(config.DATA_DIR, "run_meta.json")
+        if os.path.exists(_meta_path):
+            with open(_meta_path, encoding="utf-8") as _f:
+                _rm = json.load(_f)
+            _run_ts = _rm.get("ts", "")
+            _run_topic = _rm.get("topic", "")
+        if _sv_md and _run_ts and os.path.exists(_sv_file):
+            from datetime import datetime as _dt
+            _run_epoch = _dt.strptime(_run_ts, "%Y-%m-%d %H:%M:%S").timestamp()
+            _sv_stale = os.path.getmtime(_sv_file) < _run_epoch
+    except Exception:
+        pass
+
     _cA, _cB = st.columns([1, 1])
     with _cA:
         _gen_sv = st.button(
@@ -1778,6 +1797,11 @@ with tabS:
             except Exception as _sv_err:
                 st.error(f"生成失败: {_sv_err}")
     elif _sv_md:
+        if _sv_stale:
+            st.warning(
+                "⚠️ **该综述总结生成于上一次检索**"
+                f"（当前运行主题: {_run_topic}，完成于 {_run_ts}）——"
+                "内容已过期。请点击上方「🔄 重新生成」基于当前检索的论文刷新。")
         st.markdown(_sv_md)
         st.info("💡 AI观点部分为跨论文归纳推断，仅供参考；"
                 "引用请回到「📝 最终报告」的核验声明。")
