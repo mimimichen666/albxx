@@ -329,6 +329,25 @@ def _read_status() -> dict:
 _PID_FILE = os.path.join(config.DATA_DIR, "pipeline.pid")
 
 
+def _run_meta() -> dict:
+    """最近一次流水线运行的元数据(worker启动时落盘): 记录fast/deep模式"""
+    try:
+        with open(os.path.join(config.DATA_DIR, "run_meta.json"),
+                  encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _chain_display(chain_hits) -> str:
+    """引用链列的显示: 快速模式跳过了引用链挖掘, chain_hits恒为默认0
+    ——直接显示0会误导用户以为'挖过了但没有链'。此处按运行模式区分:
+    快速模式显示'未挖掘(快速模式)', 深度模式如实显示数字。"""
+    if not chain_hits and _run_meta().get("fast"):
+        return "未挖掘(快速模式)"
+    return str(chain_hits)
+
+
 def _alive_worker_pid():
     """返回正在运行的worker进程PID(没有则None)。
     页面刷新后session_state清零、进程句柄丢失, PID文件是跨会话判断
@@ -656,6 +675,10 @@ with st.sidebar:
     with col2:
         if st.button("📂 载入已有结果", use_container_width=True,
                      help="直接展示data/和output/目录下的历史产出"):
+            # 先清数据缓存再载入——外部方式(命令行worker/队友运行)落盘的
+            # 新结果, st.cache_data会命中旧读取, 导致页面一直显示旧数据
+            load_json.clear()
+            load_text.clear()
             st.session_state.pipeline_done = True
 
     st.divider()
@@ -1193,7 +1216,7 @@ with tab0:
 
             score_parts = (
                 f"相关性 {p.relevance_score if p.relevance_score is not None else '免检'}"
-                f" · 被引 {p.cited_by} · 引用链 {p.chain_hits}"
+                f" · 被引 {p.cited_by} · 引用链 {_chain_display(p.chain_hits)}"
                 + (f" · 综合分 {p.final_score}" if p.final_score else "")
             )
             with st.expander(
@@ -1699,6 +1722,25 @@ with tabS:
     _sv_file = os.path.join(config.OUTPUT_DIR, "survey_summary.md")
     _sv_md = load_text(_sv_file)
 
+    # 过期检测: 综述总结是手动生成的持久文件,不会随新流水线运行自动清除
+    # (综合Agent只重写final_report/review_table/citation_graph)。
+    # 比较其文件修改时间与当前运行(run_meta.json)的完成时间——
+    # 若综述总结早于本次运行,它描述的还是上一次检索的内容,提示重新生成。
+    _sv_stale, _run_ts, _run_topic = False, "", ""
+    try:
+        _meta_path = os.path.join(config.DATA_DIR, "run_meta.json")
+        if os.path.exists(_meta_path):
+            with open(_meta_path, encoding="utf-8") as _f:
+                _rm = json.load(_f)
+            _run_ts = _rm.get("ts", "")
+            _run_topic = _rm.get("topic", "")
+        if _sv_md and _run_ts and os.path.exists(_sv_file):
+            from datetime import datetime as _dt
+            _run_epoch = _dt.strptime(_run_ts, "%Y-%m-%d %H:%M:%S").timestamp()
+            _sv_stale = os.path.getmtime(_sv_file) < _run_epoch
+    except Exception:
+        pass
+
     _cA, _cB = st.columns([1, 1])
     with _cA:
         _gen_sv = st.button(
@@ -1755,6 +1797,11 @@ with tabS:
             except Exception as _sv_err:
                 st.error(f"生成失败: {_sv_err}")
     elif _sv_md:
+        if _sv_stale:
+            st.warning(
+                "⚠️ **该综述总结生成于上一次检索**"
+                f"（当前运行主题: {_run_topic}，完成于 {_run_ts}）——"
+                "内容已过期。请点击上方「🔄 重新生成」基于当前检索的论文刷新。")
         st.markdown(_sv_md)
         st.info("💡 AI观点部分为跨论文归纳推断，仅供参考；"
                 "引用请回到「📝 最终报告」的核验声明。")

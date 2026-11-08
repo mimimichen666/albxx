@@ -73,6 +73,16 @@ class RelevanceScores(BaseModel):
     )
 
 
+class TopicGateResult(BaseModel):
+    """主题门对一批免检经典的批量判定结果（2026-10-27新增）"""
+    gates: list[str] = Field(
+        description="逐篇判定列表(与输入顺序一致), 每项只能是: "
+                    "on=论文内容本身属于主题领域 | "
+                    "borderline=主题领域的通用工具/基础设施/数据集 | "
+                    "off=与主题领域无关(仅因被引用而混入)"
+    )
+
+
 # Semantic Scholar API 配置（主数据源）
 # citationCount: 被引数（影响力加成信号，替代OpenAlex的cited_by_count）
 S2_ROOT = "https://api.semanticscholar.org/graph/v1"
@@ -751,6 +761,19 @@ def _citation_chain_expand(seeds: list[PaperMeta], max_seeds: int = 12,
     seeds = [s for s in seeds if s.openalex_id][:max_seeds]
     if not seeds:
         return []
+
+    # ---- S2熔断冷却等待（2026-10-22修复: 引用链全灭的根因）----
+    # 实测因果链: 主检索阶段S2连续429触发5分钟熔断 → 检索因缓存命中
+    # 仅数秒完成 → 引用链挖掘在熔断开始后十几秒就执行 → S2兜底全部
+    # 短路 + OpenAlex对2023+论文普遍缺referenced_works（数据黑洞）
+    # → 全部种子"放弃"，chain_hits全0。
+    # 上限310秒覆盖完整熔断窗口(300秒)+缓冲——引用链是运行中一次性
+    # 阶段，最多等5分钟换回整段链信号，深度模式总耗时下划算
+    wait = _S2_BREAKER_UNTIL - time.time()
+    if 0 < wait <= 310:
+        print(f"[检索Agent] S2熔断冷却中, 引用链挖掘等待{wait:.0f}秒"
+              f"后启用S2兜底（OpenAlex对此批论文缺参考文献数据）")
+        time.sleep(wait + 2)
 
     def _count_refs(seed_like: PaperMeta):
         """把单篇种子的参考文献累加进ref_counts（短ID归一化）"""
@@ -1856,6 +1879,80 @@ def search(plan: SearchPlan, results_per_query: int = 10,
 # ---------------------------------------------------------------
 # 第2段：LLM相关性粗筛
 # ---------------------------------------------------------------
+def _classics_topic_gate(plan: SearchPlan,
+                         classics: list[PaperMeta]) -> set[str]:
+    """
+    经典免检的主题门（2026-10-27新增, 交叉领域污染防线）
+
+    背景("新冠疫情"实测案例): 引用链挖出的共被引>=3"经典"取决于
+    种子论文的参考文献构成——交叉主题下种子全是"AI+领域"论文,
+    其参考文献自然是工具领域的ML经典(ResNet/ImageNet/LSTM),
+    共被引>=3不再等于"主题领域经典", 免检直通会污染top榜
+    （ResNet综合分挤进"新冠疫情"前3, 而真正的医学论文因PDF
+    不可得全部缺席）。
+
+    轻量防线: 一次批量LLM调用判定全部免检论文与主题的关系, 三档:
+      on        = 论文内容本身属于主题领域（直通）
+      borderline= 主题领域的通用工具/基础设施/数据集
+                  （保留——如SNN主题下的PyTorch, 领域论文普遍使用）
+      off       = 与主题领域无关, 仅因被引用而混入（挡下——
+                  如纯图像分类网络之于流行病学主题）
+
+    成本: 恒定1次LLM调用（对比逐篇粗筛省~12倍）; 结果自动进
+    LLM缓存, 同主题重跑零成本。
+
+    失败语义: LLM调用/解析失败时返回空集合（全部直通）——
+    主题门是增强防线, 绝不因它引入新的流水线故障点。
+
+    返回:
+        被挡下的论文 arxiv_id 集合（供kept判定排除）
+    """
+    if not classics:
+        return set()
+
+    items = "\n".join(
+        f"{i}. 标题: {p.title}\n   摘要: {(p.abstract or '（无摘要）')[:150]}"
+        for i, p in enumerate(classics))
+    messages = [
+        {"role": "system", "content":
+            "你是学术检索的相关性把关员。请判断论文与用户研究主题的"
+            "领域关系，注意区分'属于该领域'与'被该领域引用的工具'。"},
+        {"role": "user", "content":
+            f"用户研究主题: 「{plan.topic}」\n"
+            f"筛选标准: {plan.inclusion_criteria}\n\n"
+            f"以下{len(classics)}篇论文是被引用链挖回的高被引经典候选。\n"
+            f"逐篇判断三档:\n"
+            f"- on: 论文研究内容本身属于该主题的领域\n"
+            f"- borderline: 该主题领域的通用工具/基础设施/数据集\n"
+            f"- off: 论文内容与主题领域无关(仅因被领域论文引用而混入)\n\n"
+            f"{items}\n\n"
+            f"只输出JSON: {{\"gates\": [\"on|borderline|off\", ...]}}，"
+            f"共{len(classics)}项，顺序与列表一致。"},
+    ]
+    try:
+        result = llm_client.chat_json(
+            messages, schema_class=TopicGateResult,
+            temperature=config.TEMP_EXTRACTOR,
+        )
+    except Exception as e:
+        print(f"[检索Agent] 主题门判定失败(免检经典全部直通): {e}")
+        return set()
+
+    # 宽容解析: off/off_topic均视为跑题; 缺项视为borderline保留
+    blocked: set[str] = set()
+    gates = result.gates or []
+    for i, p in enumerate(classics):
+        raw = str(gates[i]).strip().lower() if i < len(gates) else "borderline"
+        if raw.startswith("off"):
+            blocked.add(p.arxiv_id)
+            print(f"[检索Agent] 主题门挡下跑题经典: 《{p.title[:42]}》"
+                  f"(共被引{p.chain_hits}篇种子, 但内容与主题领域无关)")
+    if blocked:
+        print(f"[检索Agent] 主题门: {len(classics)}篇免检经典中"
+              f"挡下{len(blocked)}篇跑题论文")
+    return blocked
+
+
 def filter_papers(plan: SearchPlan, papers: list[PaperMeta],
                   threshold: float = 4.0) -> list[PaperMeta]:
     """
@@ -1887,6 +1984,14 @@ def filter_papers(plan: SearchPlan, papers: list[PaperMeta],
     # 经典免检: 共被引>=3的直接保留，其余送LLM打分
     classics = [p for p in papers if p.chain_hits >= 3]
     to_score = [p for p in papers if p.chain_hits < 3]
+
+    # ---- 主题门（2026-10-27, 交叉领域污染防线）----
+    # "新冠疫情"实测暴露: 交叉主题下共被引>=3挖回的是"工具领域
+    # 经典"(ResNet/ImageNet/LSTM), 直通会污染top榜。一次批量LLM
+    # 判定挡下明显跑题的（LLM失败时全部直通, 不引入新故障点）
+    gated_out = _classics_topic_gate(plan, classics)
+    classics = [p for p in classics if p.arxiv_id not in gated_out]
+
     if classics:
         print(f"[检索Agent] 经典免检通道: {len(classics)}篇"
               f"(共被引>=3)跳过LLM粗筛: "
@@ -1927,15 +2032,17 @@ def filter_papers(plan: SearchPlan, papers: list[PaperMeta],
             for p in batch:
                 p.relevance_score = 1.0
 
-    # 只保留: 达到及格线的 + 经典免检的（共被引>=3）+ 阈值补偿的
+    # 只保留: 达到及格线的 + 经典免检的（共被引>=3且过主题门）
+    # + 阈值补偿的
     # 阈值补偿: 共被引>=2的论文及格线降1分——共被引是学术界"用脚
     # 投票"的独立相关性信号，可部分对冲LLM对老论文摘要的系统性
     # 低估（如Diehl&Cook被引1463、共被引2，但LLM只打3.0分被4.0
     # 及格线拦住）。补偿后仍需>=threshold-1，防止纯背景引用混入
-    kept = [p for p in papers if p.chain_hits >= 3
-            or (p.relevance_score or 0) >= threshold
-            or (p.chain_hits >= 2
-                and (p.relevance_score or 0) >= threshold - 1.0)]
+    kept = [p for p in papers if p.arxiv_id not in gated_out
+            and (p.chain_hits >= 3
+                 or (p.relevance_score or 0) >= threshold
+                 or (p.chain_hits >= 2
+                     and (p.relevance_score or 0) >= threshold - 1.0))]
     score_strs = [
         f"{p.arxiv_id}:"
         + ("免检" if (p.chain_hits >= 3 and p.relevance_score is None)
@@ -2172,6 +2279,78 @@ def _arxiv_rescue(p: PaperMeta) -> bool:
     return False
 
 
+# ---------------------------------------------------------------
+# 医学/OA救援（2026-10-27新增, arXiv救援失败后的第4/5通道）
+# ---------------------------------------------------------------
+# 背景: "新冠疫情"实测暴露——医学核心文献(NEJM/Lancet/JAMA)全部
+# 403反爬不可下载, 真正的领域论文缺席、AI交叉论文占满top榜。
+# arXiv救援只覆盖CS/AI系论文, 这里补两条对医学论文友好的通道:
+#   第4通道: OpenAlex单作品locations[]全量OA位置
+#           （很多医学论文在PMC/大学库/出版商OA页有开放副本,
+#             数据现成, 一次查询全拿到）
+#   第5通道: DOI以10.1101/开头时构造medRxiv/bioRxiv的full.pdf直链
+#           （疫情期间医学论文大量以预印本形式发布在medRxiv）
+def _try_pdf_url(p: PaperMeta, url: str) -> bool:
+    """从指定URL直接下载PDF并校验魔数（OA救援专用紧凑版）
+
+    成功时写本地文件、填充p.local_path并打印日志; 任何失败仅
+    打印原因返回False——救援通道绝不向主流程抛异常。
+    """
+    try:
+        resp = _SESSION.get(
+            url, timeout=60,
+            headers={"User-Agent": "Mozilla/5.0 (research-agent; "
+                                   "academic PDF retrieval)"},
+        )
+        resp.raise_for_status()
+        if resp.content[:5] != b"%PDF-":
+            # OA位置常给landing page而非真PDF, 魔数校验兜底
+            print(f"[检索Agent] OA救援链接非PDF内容, 跳过: {url[:70]}")
+            return False
+        filename = f"{p.arxiv_id.replace('/', '_')}.pdf"
+        local_path = os.path.join(config.PAPER_DIR, filename)
+        with open(local_path, "wb") as f:
+            f.write(resp.content)
+        p.local_path = local_path
+        print(f"[检索Agent] OA救援成功: {filename} "
+              f"({len(resp.content) / 1024:.0f} KB)")
+        return True
+    except Exception as e:
+        print(f"[检索Agent] OA救援链接失败: {url[:70]} | {type(e).__name__}")
+        return False
+
+
+def _oa_rescue(p: PaperMeta) -> bool:
+    """
+    开放获取救援: 依次尝试OpenAlex全量OA位置 → medRxiv/bioRxiv直链
+
+    返回True表示下载成功(p.local_path已填充)。两通道均静默失败时
+    返回False（主流程照常按下载失败处理）。
+    """
+    work = None
+    # ---- 第4通道: OpenAlex locations[]里的全部开放获取副本 ----
+    if p.openalex_id and p.openalex_id.startswith("W"):
+        work = _oa_get_work(p.openalex_id, "locations,doi")
+        if work:
+            tried = {p.pdf_url} if p.pdf_url else set()
+            for loc in work.get("locations") or []:
+                u = (loc.get("pdf_url") or "").strip()
+                if u and u not in tried:
+                    tried.add(u)
+                    if _try_pdf_url(p, u):
+                        return True
+    # ---- 第5通道: medRxiv/bioRxiv预印本直链（DOI 10.1101/前缀）----
+    doi = ((work or {}).get("doi")
+           or (p.pdf_url if "10.1101" in (p.pdf_url or "") else "")) or ""
+    doi = doi.removeprefix("https://doi.org/").strip()
+    if doi.startswith("10.1101/"):
+        for host in ("www.medrxiv.org", "www.biorxiv.org"):
+            if _try_pdf_url(p, f"https://{host}/content/{doi}v1.full.pdf"):
+                return True
+    print(f"[检索Agent] OA救援失败(无可用开放获取副本): {p.title[:50]}")
+    return False
+
+
 def download(papers: list[PaperMeta], max_workers: int = 6,
              on_downloaded=None) -> list[PaperMeta]:
     """
@@ -2226,14 +2405,27 @@ def download(papers: list[PaperMeta], max_workers: int = 6,
 
     # ---- 二次救援: 主链接失败的论文尝试arXiv标题反查 ----
     # 出版社403/HTML落地页的论文，很多在arXiv有预印本副本
+    # （2026-10-27: arXiv救援再失败后追加OA救援——OpenAlex全量
+    #   OA位置+medRxiv/bioRxiv直链，补医学论文无arXiv副本的缺口）
     if failed:
         print(f"[检索Agent] 主链接失败{len(failed)}篇，尝试arXiv救援...")
         time.sleep(2)  # 给arXiv API留间隔
+        oa_failed = []
         for p in failed:
             budget.check("检索Agent(arXiv救援)")  # 超预算停止救援剩余论文
             if _arxiv_rescue(p):
                 downloaded.append(p)
                 _notify(p)  # 救援成功同样触发提取
+            else:
+                oa_failed.append(p)
+        if oa_failed:
+            print(f"[检索Agent] arXiv救援未命中{len(oa_failed)}篇，"
+                  f"尝试OA救援(OpenAlex开放副本/medRxiv)...")
+            for p in oa_failed:
+                budget.check("检索Agent(OA救援)")
+                if _oa_rescue(p):
+                    downloaded.append(p)
+                    _notify(p)
 
     print(f"[检索Agent] PDF下载完成: {len(downloaded)}/{len(papers)} 篇"
           f"（含救援成功）")

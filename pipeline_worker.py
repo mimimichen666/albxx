@@ -104,6 +104,13 @@ def run_pipeline(topic: str, top_k: int, mode: str, years: int,
                 (p, extract_pool.submit(extractor.extract_card, p)))
 
     try:
+        # ---- 运行元数据落盘(UI据此区分快速/深度模式显示) ----
+        save_json(os.path.join(config.DATA_DIR, "run_meta.json"), {
+            "topic": topic, "mode": mode, "fast": bool(fast),
+            "top_k": top_k, "years": years,
+            "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+        })
+
         # ---- 1+2. 检索阶段（标准 / 三模式两条路径, 模式未命中降级标准）----
         use_mode = mode in ("mode1", "mode2", "mode3")
         mode_miss = False
