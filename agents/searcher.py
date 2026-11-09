@@ -1898,8 +1898,15 @@ def filter_papers(plan: SearchPlan, papers: list[PaperMeta],
         messages = [
             {"role": "system", "content":
                 "你是文献筛选助手。根据筛选标准给每篇论文的摘要打相关性分(1-5分)。\n"
-                "5=完全切题且满足所有标准, 4=高度相关, 3=部分相关, "
-                "2=勉强沾边, 1=不相关。"},
+                "5=论文核心贡献直接属于研究主题领域且满足所有标准, 4=高度相关, "
+                "3=主题的邻近领域(综述里只会一笔带过的相关工作), "
+                "2=与主题仅共享泛化词(如real-time/system/performance/platform/"
+                "optimization这类跨领域通用词)但核心贡献属于别的领域, "
+                "1=不相关。\n"
+                "判分依据是论文的核心贡献属于哪个领域，而不是摘要里是否"
+                "出现了检索词的字面——检索词撞词但主题无关的论文必须打2分"
+                "以下(2026-11-04新增: '操作系统'检索曾放行靠real-time撞词"
+                "的驾驶姿势CNN论文)。"},
             {"role": "user", "content":
                 f"筛选标准: {plan.inclusion_criteria}\n"
                 f"研究主题: {plan.topic}\n\n"

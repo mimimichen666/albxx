@@ -145,8 +145,74 @@ def _fetch_references(paper: "PaperMeta") -> list[str]:
         refs = _searcher._seed_references(paper)
         if refs:
             return refs
-    # 兜底通道: S2（W-ID论文标题解析 / OpenAlex缺参考文献数据）
+        # 主记录+重复记录都缺引用数据 -> S2兜底（额度受限，最后手段）
+        return _searcher._s2_references_as_wids(paper)
+    # 2026-11-03修复(S2额度枯竭引用链消失): 无openalex_id的论文不再
+    # 直接押注S2——先按标题在OpenAlex反查W-ID(相似度>=0.92防拿错)，
+    # 再走上面同一条OpenAlex主通道，全程不消耗S2额度；
+    # S2退为两级都失败后的最后兜底
+    resolved = _oa_resolve_openalex_id(paper.title)
+    if resolved:
+        probe = paper.model_copy(update={"openalex_id": resolved})
+        refs = _searcher._seed_references(probe)
+        if refs:
+            return refs
     return _searcher._s2_references_as_wids(paper)
+
+
+def _oa_resolve_openalex_id(title: str) -> str:
+    """按标题在OpenAlex精确反查W-ID（2026-11-03新增）。
+    相似度门限0.92与_seed_references重复记录兜底同级——门限放宽会
+    拿到相近标题论文的参考文献，污染互引判定。失败返回空串。"""
+    from difflib import SequenceMatcher
+    from agents import searcher as _searcher
+    data = _searcher._oa_request({
+        "filter": f"title.search:{_searcher._oa_title_query(title)}",
+        "per_page": 5,
+        "select": "id,title",
+    })
+    if not data:
+        return ""
+    norm = _searcher._norm_title(title)
+    for cand in data.get("results", []):
+        cand_id = (cand.get("id") or "").split("/")[-1]
+        if not cand_id.startswith("W"):
+            continue
+        cand_norm = _searcher._norm_title(cand.get("title") or "")
+        if cand_norm == norm or SequenceMatcher(
+                None, norm, cand_norm).ratio() >= 0.92:
+            return cand_id
+    return ""
+
+
+def _inline_vis_assets(html_path: str) -> None:
+    """把pyvis模板里的vis-network CDN引用替换为本地内联（2026-11-03）。
+    Streamlit组件以srcdoc渲染iframe——CDN加载不到时图谱整页空白
+    （用户反馈"网页引用链没有了"的直接原因之一）。资源在本项目
+    assets/下；缺失则保持CDN引用不动，不阻塞图谱生成。"""
+    import re as _re
+    asset_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets")
+    js_path = os.path.join(asset_dir, "vis-network.min.js")
+    css_path = os.path.join(asset_dir, "vis-network.min.css")
+    if not (os.path.exists(js_path) and os.path.exists(css_path)):
+        print("[综合Agent] assets/缺vis资源，图谱保持CDN引用")
+        return
+    with open(html_path, encoding="utf-8") as f:
+        html = f.read()
+    with open(js_path, encoding="utf-8") as f:
+        js = f.read()
+    with open(css_path, encoding="utf-8") as f:
+        css = f.read()
+    m = _re.search(r"<link[^>]*vis-network\.min\.css[^>]*>", html)
+    if m:
+        html = html.replace(m.group(0), f"<style>{css}</style>")
+    m = _re.search(r"<script[^>]*vis-network\.min\.js[^>]*>\s*</script>", html)
+    if m:
+        html = html.replace(m.group(0), f"<script>{js}</script>")
+    with open(html_path, "w", encoding="utf-8") as f:
+        f.write(html)
+    print("[综合Agent] vis.js已内联本地资源（断网也能渲染图谱）")
 
 
 def build_graph(papers: list[PaperMeta],
@@ -184,11 +250,19 @@ def build_graph(papers: list[PaperMeta],
 
     # ---- 尝试真实引用关系（并行获取，串行需每篇1秒间隔+请求耗时）----
     from concurrent.futures import ThreadPoolExecutor
-    # 2026-10-15: 3→6线程(S2引用数据拉取, 多数场景走缓存秒回)
+    # 2026-10-25: 3→6线程(引用数据拉取, 多数场景走缓存秒回)
+    # 2026-11-03: 单篇包try/except——executor.map遇第一个异常会把
+    # 整个build_graph炸掉, 页面"引用图谱未生成"; 单篇失败置空即可
     with ThreadPoolExecutor(max_workers=6) as executor:
+        def _safe_refs(_p):
+            try:
+                return _fetch_references(_p)
+            except Exception as _e:
+                print(f"[综合Agent] 引用拉取异常《{_p.title[:30]}...》: {_e}")
+                return []
         # 并行拉取所有论文的参考文献列表（保持与papers相同的顺序）
         # 2026-10-25: 传paper对象——W-ID论文需标题解析,见_fetch_references
-        all_refs = list(executor.map(_fetch_references, papers))
+        all_refs = list(executor.map(_safe_refs, papers))
 
     # ---- 显式添加检索论文节点（2026-10-25修复"只有一篇绿节点"）----
     # 旧逻辑绿节点只随边间接产生: 外部边配额被第一篇吃光后，其余
@@ -226,8 +300,8 @@ def build_graph(papers: list[PaperMeta],
 
     # ---- 降级方案：论文-方法分类二部图 ----
     if G.number_of_edges() == 0:
-        graph_mode = "论文-方法分类二部图（S2引用数据不可达，自动降级）"
-        print("[综合Agent] S2引用数据不可达，降级为论文-分类二部图")
+        graph_mode = "论文-方法分类二部图（OpenAlex/S2引用数据均不可达，自动降级）"
+        print("[综合Agent] OpenAlex与S2引用数据均不可达，降级为论文-分类二部图")
         cat_by_id = {c.arxiv_id: c.method_category for c in cards}
         for p in papers:
             cat = cat_by_id.get(p.arxiv_id, "未分类")
@@ -262,6 +336,7 @@ def build_graph(papers: list[PaperMeta],
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     path = os.path.join(OUTPUT_DIR, "citation_graph.html")
     net.write_html(path, notebook=False)
+    _inline_vis_assets(path)   # 2026-11-03: CDN改本地内联, 断网也能渲染
     print(f"[综合Agent] 图谱已生成: {path} (模式: {graph_mode}, "
           f"{G.number_of_nodes()}节点/{G.number_of_edges()}边)")
     return path

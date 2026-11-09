@@ -10,7 +10,7 @@ app.py —— Streamlit前端（Demo展示界面）
   侧边栏: 主题输入 + 目标篇数 + 启动按钮 + 说明
   主区域:
     - 运行状态区: 四个Agent的实时进度
-    - 结果标签页: 📄信息卡片 | ✅审查明细 | 📊综述表格 | 🕸引用图谱 | 📝最终报告
+    - 结果标签页: 🔍检索结果 | 📚综述总结(自动生成) | 🤖AI助手(含💬可信问答模块)；🗂更多: 📄信息卡片 | ✅审查明细 | 🕸引用图谱 | 📚论文原文 | 📝最终报告 | ⚔️对比阅读 | 📖新手指南
   复用按钮: 已有数据时可直接展示产出（不用重新跑流水线）
 """
 
@@ -749,54 +749,6 @@ if cards is None:
 
 
 # ---------------------------------------------------------------
-# 综述总结（叙述性综述 + AI观点）的数据组织
-# ---------------------------------------------------------------
-def _survey_input() -> str:
-    """
-    组织"综述总结"的LLM输入: 每篇论文的元数据 + 核验通过的关键声明
-
-    声明只采用通过审查核验的（verdict=supported），保持本系统
-    "不编造"的基调; 无核验结果时退化为不过滤（每篇最多取3条）。
-    """
-    supported_keys: set = set()
-    for r in (reviews or []):
-        try:
-            if r.verdict.verdict == "supported":
-                supported_keys.add(f"{r.arxiv_id}#{r.claim_index}")
-        except Exception:
-            pass
-
-    cards_by_id = {c.arxiv_id: c for c in (cards or [])}
-    blocks = []
-    for i, p in enumerate(papers or [], 1):
-        card = cards_by_id.get(p.arxiv_id)
-        lines = [f"[{i}] 标题: {p.title}",
-                 f"    年份: {p.year}  被引次数: {getattr(p, 'cited_by', 0)}"]
-        abstract = (p.abstract or "").strip()
-        if abstract:
-            lines.append(f"    摘要: {abstract[:500]}")
-        if card:
-            kept = []
-            for idx, cl in enumerate(card.claims or []):
-                key = f"{p.arxiv_id}#{idx}"
-                ok = (key in supported_keys) if supported_keys else True
-                if ok:
-                    kept.append(cl.content)
-            for c in kept[:4]:
-                lines.append(f"    · 关键信息: {c[:220]}")
-        blocks.append("\n".join(lines))
-    return "\n\n".join(blocks) if blocks else ""
-
-
-def _survey_topic() -> str:
-    """取当前研究主题（流水线会话或worker状态文件）"""
-    t = st.session_state.get("run_outputs", {}).get("topic", "")
-    if not t:
-        t = _read_status().get("topic", "")
-    return t
-
-
-# ---------------------------------------------------------------
 # 证据链穿透面板（方案一核心UI组件）
 # ---------------------------------------------------------------
 def evidence_popover(label: str, arxiv_id: str, claim_index: int,
@@ -870,7 +822,7 @@ st.markdown("""
     <span style="background:rgba(255,255,255,.18); border-radius:999px;
       padding:4px 14px; margin-right:8px; font-size:.85rem;">📎 证据链穿透到PDF原文</span>
     <span style="background:rgba(255,255,255,.18); border-radius:999px;
-      padding:4px 14px; margin-right:8px; font-size:.85rem;">⚡ 学术争议发现</span>
+      padding:4px 14px; margin-right:8px; font-size:.85rem;">📚 综述总结自动生成</span>
     <span style="background:rgba(255,255,255,.18); border-radius:999px;
       padding:4px 14px; font-size:.85rem;">🕸 引用图谱</span>
   </div>
@@ -915,24 +867,26 @@ if reviews:
 
 # ================================================================
 # 分层导航设计（降低标签栏认知负担）
-# 高频标签平铺在第一层（结果消费动线: 找论文→读报告→问答→问AI）;
-# 低频标签收进「🗂 更多」里的第二层标签栏——老用户不受新手指南等
-# 低频入口干扰，但功能一个不少（Streamlit支持嵌套tabs，内容天然隔离）。
+# 高频标签平铺在第一层（结果消费动线: 找论文→读总结→问AI）;
+# 低频标签收进「🗂 更多」里的第二层标签栏——最终报告等低频入口
+# 不占用一级位置，但功能一个不少（Streamlit支持嵌套tabs，内容天然隔离）。
 # 检索一律由侧边栏流水线发起（用户要求: 无独立检索入口）。
-# 变量语义与初版完全一致，下方各 with tabX: 渲染代码零改动:
+# 变量语义与初版一致，下方各 with tabX: 渲染代码零改动:
 #   tab0=检索结果 tab1=信息卡片 tab2=审查明细
-#   tab3=可信问答 tab4=学术争议 tab5=综述表格 tab6=引用图谱
-#   tab7=最终报告 tabS=综述总结 tab8=论文原文 tab9=AI助手 tabG=新手指南
+#   tab6=引用图谱 tab8=论文原文 tab7=最终报告(更多内)
+#   tabS=综述总结(自动生成) tabC=对比阅读 tabG=新手指南
+#   tab9=AI助手(含💬可信问答功能模块)
+# 2026-11-09调整: 学术争议/综述表格功能删除; 可信问答并入AI助手;
+#   综述总结改流水线自动生成; 最终报告移入「更多」。
 # ================================================================
-tab0, tab7, tabS, tab3, tab9, tab_more = st.tabs(
-    ["🔍 检索结果", "📝 最终报告", "📚 综述总结", "💬 可信问答",
-     "🤖 AI助手", "🗂 更多"])
+tab0, tabS, tab9, tab_more = st.tabs(
+    ["🔍 检索结果", "📚 综述总结", "🤖 AI助手", "🗂 更多"])
 
 with tab_more:
     st.caption("低频功能收纳于此，保持常用功能一触可达")
-    tab1, tab2, tab4, tab5, tab6, tab8, tabC, tabG = st.tabs(
-        ["📄 信息卡片", "✅ 审查明细", "⚡ 学术争议", "📊 综述表格",
-         "🕸 引用图谱", "📚 论文原文", "⚔️ 对比阅读", "📖 新手指南"])
+    tab1, tab2, tab6, tab8, tab7, tabC, tabG = st.tabs(
+        ["📄 信息卡片", "✅ 审查明细", "🕸 引用图谱", "📚 论文原文",
+         "📝 最终报告", "⚔️ 对比阅读", "📖 新手指南"])
 
 # ---- 标签页: 新手指南（核心知识解释，面向所有使用者）----
 with tabG:
@@ -966,15 +920,14 @@ with tabG:
 1. **🔍 检索结果** — 系统找到了哪些论文？为什么这篇排前面？
    每篇的徽章含义：`🔗引用链经典`=被多篇论文共同引用的奠基之作；
    `🔥高被引`=学术界公认有影响力；`🤖高度切题`=与你的主题最匹配。
-2. **📝 最终报告** — 综述正文。**看不懂？点"🍼 生成小白解读"按钮**，
-   系统会把报告转写成通俗易懂的版本。
-3. **📚 综述总结** — 两块内容: **叙述性综述**（把检索到的论文串成
-   连贯的研究故事）+ **AI观点（仅供参考）**（按"现有 XX 方法在 XX 场景
-   下具备 XX 优势，但普遍存在 XX 局限…"的句式归纳研究缺口，适合找选题）。
-4. **💬 可信问答** — 直接用中文提问！系统只根据已核验的内容回答，
-   **证据不够时宁可拒绝回答也不编造**——这是和普通AI对话最大的区别。
-5. **🤖 AI助手** — 任何疑问直接问：系统怎么用、指标什么含义、
+2. **📚 综述总结** — **流水线运行完后自动生成**，无需手动点击。两块内容:
+   **叙述性综述**（把检索到的论文串成连贯的研究故事）+
+   **AI观点（仅供参考）**（按"现有 XX 方法在 XX 场景下具备 XX 优势，
+   但普遍存在 XX 局限…"的句式归纳研究缺口，适合找选题）。
+3. **🤖 AI助手** — 任何疑问直接问：系统怎么用、指标什么含义、
    论文里某个方法的效果，它都能答（论文内容只基于已核验信息）。
+   页面下方还有内置功能模块 **💬 可信问答**——只根据已核验的声明池
+   回答，**证据不够时宁可拒绝回答也不编造**。
 
 **🎯 三模式检索**（侧边栏「检索方式」选择，作为流水线的检索阶段运行）——
 🌱**入门综述**（经典综述优先，零基础也能懂）/
@@ -985,23 +938,22 @@ with tabG:
 
 **第二层「🗂 更多」**（低频功能，点开后可见）:
 
-6. **📄 信息卡片** — 每篇论文被拆成了哪些知识点（声明）？
+4. **📄 信息卡片** — 每篇论文被拆成了哪些知识点（声明）？
    🔵=方法、🟢=实验结果、🟠=局限性说明；每条声明旁有📎证据可跳PDF原文。
-7. **✅ 审查明细** — 哪些声明通过了核实？哪些被剔除、为什么？
+5. **✅ 审查明细** — 哪些声明通过了核实？哪些被剔除、为什么？
    （被剔除≠论文差，只是那条表述与原文对不上）
-8. **⚡ 学术争议** — 论文之间打架了？谁和谁的结论冲突？
-   🔴=正面对立，🟡=表面冲突（实验条件不同导致的）。
-9. **📊 综述表格** — 各论文的方法横向对比表。
-10. **🕸 引用图谱** — 论文之间谁引用谁的关系网（可拖拽交互）。
-11. **📚 论文原文** — 想亲自读论文？选一篇就在网页里直接阅读PDF全文，
+6. **🕸 引用图谱** — 论文之间谁引用谁的关系网（可拖拽交互）。
+7. **📚 论文原文** — 想亲自读论文？选一篇就在网页里直接阅读PDF全文，
     核对系统说的和论文写的是否一致。顶部还有 **🔍 全文搜索**
     （一个关键词同时查所有本地论文，命中处高亮并可跳到对应页码）、
     **📝 阅读笔记**（给某页写批注，绑定论文与页码，本地保存可增删改）、
     **📖 核心名词速查对照**（阅读区右侧常驻最近模式检索报告的名词表，
     随读随查，可一键隐藏）。
-12. **⚔️ 对比阅读** — 挑两篇论文左右并排对比：背景/方法/结论/争议点
+8. **📝 最终报告** — 综述正文。**看不懂？点"🍼 生成小白解读"按钮**，
+   系统会把报告转写成通俗易懂的版本；支持 Markdown/Word/LaTeX 导出。
+9. **⚔️ 对比阅读** — 挑两篇论文左右并排对比：背景/方法/结论/争议点
     一屏看清，还联动显示各自的阅读笔记。
-13. **📖 新手指南** — 就是本页。熟悉系统后不用再看，需要时来「更多」找。
+10. **📖 新手指南** — 就是本页。熟悉系统后不用再看，需要时来「更多」找。
 """)
 
     with st.expander("📚 术语速查表（看不懂某个词就来这里查）", expanded=False):
@@ -1024,8 +976,8 @@ with tabG:
     with st.expander("🚀 最短上手路径（三步）", expanded=False):
         st.markdown("""
 1. 左侧边栏输入主题（**写具体些**，如"脉冲神经网络的高效训练方法"而不是"神经网络"）→ 点 **🚀 完整运行**
-2. 等待10-15分钟（系统在检索+精读+核查，日志会显示进度）
-3. 先看 **📝 最终报告**（可点"🍼 生成小白解读"），有疑问去 **💬 可信问答** 直接提问
+2. 等待10-15分钟（系统在检索+精读+核查，日志会显示进度；综述总结也会自动生成）
+3. 先看 **📚 综述总结** 与「🗂 更多 → 📝 最终报告」（可点"🍼 生成小白解读"），有疑问去 **🤖 AI助手** 直接提问
 """)
 
 # ---- 标签0: 检索结果（论文排序输出面板） ----
@@ -1357,195 +1309,6 @@ with tab2:
         except Exception as e:
             st.caption(f"Benchmark报告解析失败: {e}")
 
-# ---- 标签3: 可信问答（方案二）----
-with tab3:
-    st.subheader("💬 可信问答（Evidence-Bounded QA）")
-    st.caption("只基于已通过两级核验的声明池回答，证据不足时明确拒答——"
-               "宁可拒答，不可编造")
-
-    from agents import qa_agent as qa_mod
-
-    # 会话状态: 对话历史
-    if "qa_history" not in st.session_state:
-        st.session_state.qa_history = []
-
-    # 左右布局: 左侧对话区 + 右侧声明池浏览
-    qa_col, pool_col = st.columns([3, 2])
-
-    with qa_col:
-        # 渲染历史对话
-        for msg in st.session_state.qa_history:
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
-                # 回答消息附引用声明与拒答说明
-                if msg["role"] == "assistant" and msg.get("used_claims"):
-                    st.caption(f"依据: 声明 {msg['used_claims']}")
-                if msg["role"] == "assistant" and msg.get("missing"):
-                    st.warning(f"缺失证据: {msg['missing']}")
-
-        # 输入框
-        if q := st.chat_input("问点什么…（如: HorNet在ImageNet上的表现如何？）"):
-            st.session_state.qa_history.append(
-                {"role": "user", "content": q})
-            with st.chat_message("user"):
-                st.markdown(q)
-            with st.chat_message("assistant"):
-                with st.spinner("检索声明池并生成有据回答..."):
-                    try:
-                        ans, qa_pool = qa_mod.answer_question(
-                            q, st.session_state.qa_history[:-1])
-                        body = ans.answer
-                        if not ans.can_answer:
-                            body = (f"⚠️ {ans.answer}\n\n"
-                                    f"**缺失的证据**: {ans.missing}")
-                        st.markdown(body)
-                        if ans.used_claims:
-                            st.caption(f"依据: 声明 {ans.used_claims}")
-                            # 证据链穿透（阶段5）：声明#N -> 证据ID -> PDF页码
-                            _n2c = {c["num"]: c for c in qa_pool}
-                            for _n in ans.used_claims:
-                                _c = _n2c.get(_n)
-                                if not _c:
-                                    continue
-                                with st.expander(
-                                        f"📎 [#{_n}] {_c['content'][:60]}..."):
-                                    conf = _c.get("confidence")
-                                    st.caption(
-                                        f"证据ID `{_c['evidence_id']}` · "
-                                        f"核验置信度 {conf:.2f}"
-                                        if isinstance(conf, (int, float))
-                                        else f"证据ID `{_c['evidence_id']}`")
-                                    if _c.get("quote"):
-                                        st.markdown(
-                                            f"> `{_c.get('quote_section', '')}` "
-                                            f"{_c['quote']}")
-                                    if _c.get("page") is not None:
-                                        st.caption(
-                                            f"PDF第{_c['page'] + 1}页"
-                                            + (f" · 截图: {_c['evidence_image']}"
-                                               if _c.get("evidence_image") else ""))
-                        st.session_state.qa_history.append({
-                            "role": "assistant",
-                            "content": body,
-                            "used_claims": ans.used_claims,
-                            "missing": ans.missing if not ans.can_answer else "",
-                        })
-                    except Exception as e:
-                        st.error(f"问答失败: {e}")
-
-    with pool_col:
-        st.markdown("**📚 当前声明池**（问答的知识边界）")
-        pool = qa_mod.build_claim_pool()
-        if pool:
-            st.caption(f"共{len(pool)}条已核验声明 · 回答只能引用这些内容"
-                       f" · 均带证据ID可回溯PDF原文")
-            for c in pool:
-                type_icon = {"method": "🔵", "result": "🟢",
-                             "limitation": "🟠"}.get(c["type"], "⚪")
-                conf = c.get("confidence")
-                conf_txt = (f" · 置信度{conf:.2f}"
-                            if isinstance(conf, (int, float)) else "")
-                text = (f"{c['content'][:80]}..."
-                        if len(c["content"]) > 80 else c["content"])
-                st.markdown(
-                    f"{type_icon} **[#{c['num']}]** {text}{conf_txt}  \n"
-                    f"<span style='font-size:.75rem;color:gray'>"
-                    f"🆔 {c['evidence_id']}</span>",
-                    unsafe_allow_html=True
-                )
-        else:
-            st.info("声明池为空，请先运行完整流水线")
-
-        # 拒答能力一键自检（E5实验入口）
-        st.divider()
-        if st.button("🧪 拒答能力自检", help="运行3个可答+3个知识库外问题，"
-                     "验证系统的拒答可靠性"):
-            with st.spinner("测试中（约1分钟）..."):
-                r = qa_mod.run_refusal_test()
-            if r:
-                m1, m2 = st.columns(2)
-                m1.metric("可答组正确率", f"{r['answerable_acc']:.0%}")
-                m2.metric("拒答组正确率", f"{r['refusal_acc']:.0%}")
-                with st.expander("测试明细"):
-                    for d in r["details"]:
-                        mark = "✓" if d["correct"] else "✗"
-                        st.markdown(
-                            f"{mark} {'应答' if d['expect_answerable'] else '应拒'}"
-                            f"→{'答了' if d['actual_answerable'] else '拒答'} "
-                            f"| {d['question']}")
-
-# ---- 标签4: 学术争议（方案三）----
-with tab4:
-    st.subheader("⚡ 学术争议（矛盾检测Agent产出）")
-    st.caption("在已核验声明间自动检测观点冲突——"
-               "🔴 直接矛盾(结论对立) | 🟡 张力(条件不同导致的表象冲突)。"
-               "每条争议声明可点击📎穿透到PDF原文")
-
-    conflicts = load_json(os.path.join(config.DATA_DIR, "conflicts.json"))
-
-    if not conflicts:
-        st.info("当前声明池未检测到学术争议（论文主题较分散时属正常）。"
-                "论文数更多、主题更聚焦时争议检出率更高。")
-        # 手动触发按钮（历史数据没有conflicts.json时用）
-        if st.button("⚡ 立即检测矛盾"):
-            with st.spinner("检测中（预筛+LLM精判，约1-3分钟）..."):
-                from agents import conflict_detector
-                conflict_detector.run()
-                load_json.clear()
-                st.rerun()
-    else:
-        n_con = sum(1 for c in conflicts if c["relation"] == "contradict")
-        n_ten = len(conflicts) - n_con
-        m1, m2 = st.columns(2)
-        m1.metric("直接矛盾", f"{n_con} 处")
-        m2.metric("张力关系", f"{n_ten} 处")
-
-        for c in conflicts:
-            icon = "🔴" if c["relation"] == "contradict" else "🟡"
-            sev = "★" * c["severity"] + "☆" * (5 - c["severity"])
-            with st.expander(
-                f"{icon} [{c['relation']}] {c['topic']} "
-                f"(严重度 {sev}) — {c['explanation'][:40]}..."
-            ):
-                st.markdown(f"**分析**: {c['explanation']}")
-
-                # 双方观点对照展示（各带证据穿透与核验置信度）
-                for side, label in [("a", "观点A"), ("b", "观点B")]:
-                    s = c[side]
-                    st.markdown(f"**{label}**: "
-                                f"《{s['paper_title'][:40]}》"
-                                f"({s['year']}, arXiv:{s['arxiv_id']})"
-                                + (f" · 置信度{s['confidence']:.2f}"
-                                   if isinstance(s.get("confidence"),
-                                                 (int, float)) else ""))
-                    s_col, e_col = st.columns([5, 1])
-                    with s_col:
-                        st.markdown(f"> {s['content']}")
-                        if s.get("quote"):
-                            st.caption(f"🆔 {s['key']} · "
-                                       f"引用: {s['quote'][:80]}")
-                    with e_col:
-                        evidence_popover(
-                            "📎 证据", s["arxiv_id"], s["claim_index"],
-                            s["content"])
-                st.divider()
-
-        # 重新检测按钮（数据更新后刷新）
-        if st.button("🔄 重新检测"):
-            with st.spinner("检测中..."):
-                from agents import conflict_detector
-                conflict_detector.run()
-                load_json.clear()
-                st.rerun()
-
-# ---- 标签5: 综述表格 ----
-with tab5:
-    st.subheader("方法分类对比表（仅收录通过核验的声明）")
-    if table_md:
-        st.markdown(table_md)
-    else:
-        st.warning("综述表格未生成")
-
 # ---- 标签6: 引用图谱 ----
 with tab6:
     st.subheader("引用关系图谱（交互式）")
@@ -1685,7 +1448,8 @@ AI查语义曲解），每条关键信息理论上都可回溯到PDF原文。
 with tabS:
     st.subheader("综述总结")
     st.caption("📖 **叙述性综述**: 把本次检索到的论文串成连贯的研究故事；"
-               "💡 **AI观点**: 跨论文的归纳推断（仅供参考，非论文原文结论）。")
+               "💡 **AI观点**: 跨论文的归纳推断（仅供参考，非论文原文结论）。"
+               "**流水线运行完成后自动生成**，无需手动点击。")
     with st.expander("🧭 这两块内容有什么区别？"):
         st.markdown("""
 **叙述性综述** — 严格基于本次检索论文的核验信息，按
@@ -1699,68 +1463,17 @@ with tabS:
     _sv_file = os.path.join(config.OUTPUT_DIR, "survey_summary.md")
     _sv_md = load_text(_sv_file)
 
-    _cA, _cB = st.columns([1, 1])
-    with _cA:
-        _gen_sv = st.button(
-            "✍️ 生成综述总结" if not _sv_md else "🔄 重新生成",
-            help="基于当前检索到的论文重新生成；流式输出，请停留在本页")
-    with _cB:
-        if _sv_md:
-            st.download_button("⬇️ 下载 (Markdown)", data=_sv_md,
-                               file_name="survey_summary.md",
-                               mime="text/markdown")
-
-    if _gen_sv:
-        _src = _survey_input()
-        if not _src:
-            st.warning("没有可用的论文数据，请先完整运行一次流水线")
-        else:
-            _topic_sv = _survey_topic()
-            _topic_line = f"研究主题: {_topic_sv}\n" if _topic_sv else ""
-            st.caption("⏳ 正在生成... 下方文字逐步出现，请停留在本页（约1-3分钟）")
-            import llm_client
-            _sv_prompt = (
-                "你是资深学术综述撰稿人兼领域分析师。"
-                f"{_topic_line}"
-                "基于给定的论文清单（[编号]为引用标识），输出两部分内容。\n\n"
-                "【第一部分: 叙述性综述】\n"
-                "- 用连贯的叙述性文字（禁止表格、禁止罗列式堆砌）梳理研究图景\n"
-                "- 按脉络组织: 研究背景与动机 → 现有工作按思路分派 → "
-                "各派代表工作与核心思想 → 发展趋势\n"
-                "- 只能使用给定论文的信息，不得编造未提供的文献、数据或结论；"
-                "提及具体工作时标注[编号]（600-900字）\n\n"
-                "【第二部分: AI观点（仅供参考）】\n"
-                "- 对检索出的论文做跨文献归纳偏置分析，输出3-5条观点\n"
-                "- 每条观点必须遵循如下句式骨架（用实际归纳内容填充XX）:\n"
-                "  现有 XX 方法在 XX 场景下具备 XX 优势，但普遍存在 XX 局限，"
-                "在 XX 条件下效果不足，目前针对该问题的相关研究较少，"
-                "有待进一步探索\n"
-                "- 每条观点后标注依据: (支撑: [编号])；无直接支撑的推断标 (推断)\n"
-                "- 观点之间不重复，各自覆盖不同的方法路线或维度\n\n"
-                "输出为markdown，结构如下:\n"
-                "# 📖 叙述性综述\n（正文）\n"
-                "# 💡 AI观点（仅供参考）\n1. ...\n2. ...\n"
-                "（结尾附一行提示: 以上观点为AI归纳推断，仅供参考）\n\n"
-                "论文清单如下:\n" + _src)
-            try:
-                _out_sv = st.write_stream(llm_client.chat_stream(
-                    [{"role": "system",
-                      "content": "你是严谨的学术综述撰稿人，忠于给定材料。"},
-                     {"role": "user", "content": _sv_prompt}],
-                    temperature=0.3))
-                if _out_sv:
-                    with open(_sv_file, "w", encoding="utf-8") as f:
-                        f.write(_out_sv)
-                    st.success("已生成并保存到 output/survey_summary.md")
-            except Exception as _sv_err:
-                st.error(f"生成失败: {_sv_err}")
-    elif _sv_md:
+    if _sv_md:
+        st.download_button("⬇️ 下载 (Markdown)", data=_sv_md,
+                           file_name="survey_summary.md",
+                           mime="text/markdown")
         st.markdown(_sv_md)
         st.info("💡 AI观点部分为跨论文归纳推断，仅供参考；"
-                "引用请回到「📝 最终报告」的核验声明。")
+                "引用请回到「🗂 更多 → 📝 最终报告」的核验声明。")
     else:
-        st.info("尚无综述总结——点击上方「✍️ 生成综述总结」基于当前"
-                "检索到的论文生成（叙述性综述 + AI观点）。")
+        st.info("尚无综述总结——完整运行一次流水线后自动生成"
+                "（叙述性综述 + AI观点）；也可点侧边栏「📂 载入已有结果」"
+                "查看历史运行的总结。")
 
 # ---- 标签8: 论文原文（PDF搜索 + 本地PDF在线阅读）----
 with tab8:
@@ -2318,7 +2031,7 @@ with tab9:
             "- 系统定位: 科研文献整理Agent。用户输入研究主题后自动执行"
             "五段流水线: 规划(生成检索词)→检索(下载论文PDF)→提取(信息卡片)"
             "→审查(两级防幻觉核验)→综合(综述报告)。另有证据定位(PDF原文"
-            "高亮穿透)和矛盾检测(学术争议发现)两个后处理。\n"
+            "高亮穿透)等后处理。\n"
             "- 操作: 左侧边栏输入研究主题（建议具体，如'脉冲神经网络的"
             "高效训练方法'），选目标论文数，点'🚀 完整运行'（约10-15分钟，"
             "运行中勿重复点击）；已有结果点'📂 载入已有结果'。"
@@ -2329,16 +2042,15 @@ with tab9:
             "进入提取→审查→综合全流程；流水线还会为命中论文生成"
             "数量无上限的核心名词速查表。\n"
             "- 标签页(两层导航): 第一层常用=🔍检索结果(四种排序+徽章) | "
-            "📝最终报告(可生成🍼小白解读，支持Word/LaTeX导出) | "
-            "📚综述总结(叙述性综述+AI观点，观点按'现有XX方法在XX场景"
-            "具备XX优势，但普遍存在XX局限，在XX条件下效果不足，"
-            "相关研究较少有待探索'句式归纳研究缺口，仅供参考) | "
-            "💬可信问答(仅基于声明池、"
-            "证据不足会拒答) | 🤖AI助手(本页面)；第二层🗂更多=📄信息卡片"
+            "📚综述总结(流水线运行完后自动生成: 叙述性综述+AI观点，观点按"
+            "'现有XX方法在XX场景具备XX优势，但普遍存在XX局限，在XX条件下"
+            "效果不足，相关研究较少有待探索'句式归纳研究缺口，仅供参考) | "
+            "🤖AI助手(本页面，含内置💬可信问答功能模块: 仅基于声明池、"
+            "证据不足会拒答)；第二层🗂更多=📄信息卡片"
             "(每篇论文的声明+📎证据原文) | ✅审查明细(每条声明核验结果) | "
-            "⚡学术争议(论文间矛盾) | 📊综述表格 | 🕸引用图谱 | "
-            "📚论文原文(PDF滚动阅读+🔍全文搜索跨文档高亮跳页+📝页面级"
-            "笔记增删改+📖核心名词速查对照面板可显示隐藏) | "
+            "🕸引用图谱 | 📚论文原文(PDF滚动阅读+🔍全文搜索跨文档高亮跳页"
+            "+📝页面级笔记增删改+📖核心名词速查对照面板可显示隐藏) | "
+            "📝最终报告(可生成🍼小白解读，支持Word/LaTeX导出) | "
             "⚔️对比阅读(双文献并排卡片: 背景/方法/结论/"
             "争议点，联动笔记) | 📖新手指南(3分钟入门)。\n"
             "- 关键指标: 声明=从论文摘出的可核实信息；通过核验=引用真实"
@@ -2437,3 +2149,137 @@ with tab9:
     if st.button("🗑 清空对话"):
         st.session_state.assist_history = []
         st.rerun()
+
+    # ================================================================
+    # AI助手·内置功能模块: 可信问答（Evidence-Bounded QA）
+    # （2026-11-09从一级标签收编入AI助手，成为其功能模块之一）
+    # ================================================================
+    with tab9:
+        _qa_box = st.expander("💬 可信问答模块（Evidence-Bounded QA）",
+                              expanded=False)
+
+    with _qa_box:
+        st.caption("AI助手的证据受限问答模块：只基于已通过两级核验的"
+                   "声明池回答，证据不足时明确拒答——宁可拒答，不可编造")
+
+        from agents import qa_agent as qa_mod
+
+        # 会话状态: 对话历史
+        if "qa_history" not in st.session_state:
+            st.session_state.qa_history = []
+
+        # 左右布局: 左侧对话区 + 右侧声明池浏览
+        qa_col, pool_col = st.columns([3, 2])
+
+        with qa_col:
+            # 渲染历史对话
+            for msg in st.session_state.qa_history:
+                with st.chat_message(msg["role"]):
+                    st.markdown(msg["content"])
+                    # 回答消息附引用声明与拒答说明
+                    if msg["role"] == "assistant" and msg.get("used_claims"):
+                        st.caption(f"依据: 声明 {msg['used_claims']}")
+                    if msg["role"] == "assistant" and msg.get("missing"):
+                        st.warning(f"缺失证据: {msg['missing']}")
+
+            # 输入框（text_input+按钮: chat_input全页仅AI助手一个，不可重复）
+            _qa_ic, _qa_bc = st.columns([5, 1])
+            with _qa_ic:
+                _q_in = st.text_input(
+                    "你的问题", key="qa_module_input",
+                    placeholder="问点什么…（如: HorNet在ImageNet上的表现如何？）",
+                    label_visibility="collapsed")
+            with _qa_bc:
+                st.write("")  # 对齐输入框基线
+                _qa_ask = st.button("💬 提问", use_container_width=True)
+
+            if _qa_ask and _q_in.strip():
+                q = _q_in.strip()
+                st.session_state.qa_history.append(
+                    {"role": "user", "content": q})
+                with st.chat_message("user"):
+                    st.markdown(q)
+                with st.chat_message("assistant"):
+                    with st.spinner("检索声明池并生成有据回答..."):
+                        try:
+                            ans, qa_pool = qa_mod.answer_question(
+                                q, st.session_state.qa_history[:-1])
+                            body = ans.answer
+                            if not ans.can_answer:
+                                body = (f"⚠️ {ans.answer}\n\n"
+                                        f"**缺失的证据**: {ans.missing}")
+                            st.markdown(body)
+                            if ans.used_claims:
+                                st.caption(f"依据: 声明 {ans.used_claims}")
+                                # 证据链穿透（阶段5）：声明#N -> 证据ID -> PDF页码
+                                _n2c = {c["num"]: c for c in qa_pool}
+                                for _n in ans.used_claims:
+                                    _c = _n2c.get(_n)
+                                    if not _c:
+                                        continue
+                                    with st.expander(
+                                            f"📎 [#{_n}] {_c['content'][:60]}..."):
+                                        conf = _c.get("confidence")
+                                        st.caption(
+                                            f"证据ID `{_c['evidence_id']}` · "
+                                            f"核验置信度 {conf:.2f}"
+                                            if isinstance(conf, (int, float))
+                                            else f"证据ID `{_c['evidence_id']}`")
+                                        if _c.get("quote"):
+                                            st.markdown(
+                                                f"> `{_c.get('quote_section', '')}` "
+                                                f"{_c['quote']}")
+                                        if _c.get("page") is not None:
+                                            st.caption(
+                                                f"PDF第{_c['page'] + 1}页"
+                                                + (f" · 截图: {_c['evidence_image']}"
+                                                   if _c.get("evidence_image") else ""))
+                            st.session_state.qa_history.append({
+                                "role": "assistant",
+                                "content": body,
+                                "used_claims": ans.used_claims,
+                                "missing": ans.missing if not ans.can_answer else "",
+                            })
+                        except Exception as e:
+                            st.error(f"问答失败: {e}")
+
+        with pool_col:
+            st.markdown("**📚 当前声明池**（问答的知识边界）")
+            pool = qa_mod.build_claim_pool()
+            if pool:
+                st.caption(f"共{len(pool)}条已核验声明 · 回答只能引用这些内容"
+                           f" · 均带证据ID可回溯PDF原文")
+                for c in pool:
+                    type_icon = {"method": "🔵", "result": "🟢",
+                                 "limitation": "🟠"}.get(c["type"], "⚪")
+                    conf = c.get("confidence")
+                    conf_txt = (f" · 置信度{conf:.2f}"
+                                if isinstance(conf, (int, float)) else "")
+                    text = (f"{c['content'][:80]}..."
+                            if len(c["content"]) > 80 else c["content"])
+                    st.markdown(
+                        f"{type_icon} **[#{c['num']}]** {text}{conf_txt}  \n"
+                        f"<span style='font-size:.75rem;color:gray'>"
+                        f"🆔 {c['evidence_id']}</span>",
+                        unsafe_allow_html=True
+                    )
+            else:
+                st.info("声明池为空，请先运行完整流水线")
+
+            # 拒答能力一键自检（E5实验入口）
+            st.divider()
+            if st.button("🧪 拒答能力自检", help="运行3个可答+3个知识库外问题，"
+                         "验证系统的拒答可靠性"):
+                with st.spinner("测试中（约1分钟）..."):
+                    r = qa_mod.run_refusal_test()
+                if r:
+                    m1, m2 = st.columns(2)
+                    m1.metric("可答组正确率", f"{r['answerable_acc']:.0%}")
+                    m2.metric("拒答组正确率", f"{r['refusal_acc']:.0%}")
+                    with st.expander("测试明细"):
+                        for d in r["details"]:
+                            mark = "✓" if d["correct"] else "✗"
+                            st.markdown(
+                                f"{mark} {'应答' if d['expect_answerable'] else '应拒'}"
+                                f"→{'答了' if d['actual_answerable'] else '拒答'} "
+                                f"| {d['question']}")
