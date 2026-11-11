@@ -49,6 +49,12 @@ import html as _htmllib
 
 import requests
 
+# HTTP连接复用(2026-10-16优化2): 模块级Session复用TCP/TLS连接, 省去
+# 每次请求的握手开销(100-300ms/次, 全流程几十个请求累计省数秒)。
+# urllib3连接池线程安全, 并发检索/下载共用无碍; 每次调用的headers
+# 参数会覆盖会话默认值, 现有鉴权/UA逻辑不受影响
+_SESSION = requests.Session()
+
 import llm_client
 import config
 import budget
@@ -204,7 +210,7 @@ def _oa_request(params: dict, max_retries: int = 4) -> dict | None:
     for attempt in range(max_retries):
         try:
             _t0 = time.perf_counter()
-            resp = requests.get(
+            resp = _SESSION.get(
                 OPENALEX_API_BASE, params=params,
                 headers={"User-Agent": OPENALEX_UA}, timeout=30,
             )
@@ -465,7 +471,7 @@ def _oa_get_work(openalex_id: str,
     for attempt in range(3):
         try:
             _t0 = time.perf_counter()
-            resp = requests.get(url, params={"select": select},
+            resp = _SESSION.get(url, params={"select": select},
                                 headers={"User-Agent": OPENALEX_UA},
                                 timeout=30)
             resp.raise_for_status()
@@ -960,7 +966,7 @@ def _arxiv_search_html(kw: str, limit: int) -> list[PaperMeta]:
     主站页面仍可正常访问（2026-09-09: API三变体全reset、主站200）。
     """
     try:
-        resp = requests.get(
+        resp = _SESSION.get(
             "https://arxiv.org/search/",
             params={"query": kw, "searchtype": "all", "size": 50},
             timeout=30, headers={"User-Agent": "literature-agent/0.1"})
@@ -1032,7 +1038,7 @@ def _arxiv_request(params: dict) -> str | None:
         return _hit.get("_xml", "")
     try:
         _t0 = time.perf_counter()
-        resp = requests.get(ARXIV_API_BASE, params=params, timeout=30)
+        resp = _SESSION.get(ARXIV_API_BASE, params=params, timeout=30)
         resp.raise_for_status()
     except Exception:
         return None  # 失败不缓存（下次还会真实重试）
@@ -1125,7 +1131,7 @@ def _crossref_request(params: dict, max_retries: int = 3) -> dict | None:
     for attempt in range(max_retries):
         try:
             _t0 = time.perf_counter()
-            resp = requests.get(CROSSREF_API_BASE, params=params,
+            resp = _SESSION.get(CROSSREF_API_BASE, params=params,
                                 headers={"User-Agent": CROSSREF_UA},
                                 timeout=30)
             resp.raise_for_status()
@@ -1289,7 +1295,7 @@ def _s2_request(params: dict, max_retries: int = 3,
         budget.check("检索Agent(S2请求)")  # 超预算立即中止（含429退避等待前）
         try:
             _t0 = time.perf_counter()
-            resp = requests.get(url or S2_API_BASE, params=params,
+            resp = _SESSION.get(url or S2_API_BASE, params=params,
                                 headers=headers, timeout=30)
             if resp.status_code == 429:
                 # 优先尊重服务端给的Retry-After（秒），没有则用退避序列
@@ -1972,7 +1978,7 @@ def _download_one(p: PaperMeta) -> bool:
         # （重置是瞬时的，多试几次总能碰上畅通窗口）
         for attempt in range(6):
             try:
-                resp = requests.get(
+                resp = _SESSION.get(
                     p.pdf_url,
                     headers={"User-Agent": "literature-agent/0.1 (course project)"},
                     timeout=60,
@@ -1990,9 +1996,10 @@ def _download_one(p: PaperMeta) -> bool:
             except Exception as dl_err:
                 if attempt == 5:
                     raise dl_err  # 最后一次也失败，交给外层处理
-                # 短间隔重试: 连接重置(10054)是瞬时故障,立即重连通常就成功
-                # （旧值5/10/15秒过于保守,实测重置后2秒重连即可）
-                wait = 2 * (attempt + 1)
+                # 短间隔重试(2026-10-16优化3: 2/4/6/8/10→1/2/4/4/4):
+                # 连接重置(10054)是瞬时故障, 1-2秒重连即可; 现在只下
+                # arXiv托管PDF(成功率近100%), 长等待的收益场景已消失
+                wait = (1, 2, 4, 4, 4)[attempt]
                 print(f"[检索Agent] 下载中断(第{attempt + 1}次)，"
                       f"{wait}秒后重试: {dl_err}")
                 time.sleep(wait)
@@ -2031,7 +2038,7 @@ def _download_arxiv_by_id(p: PaperMeta, raw_id: str) -> bool:
     # 沿用主下载的重试逻辑（连接重置是常态）
     for attempt in range(6):
         try:
-            r = requests.get(rescue_url, timeout=60,
+            r = _SESSION.get(rescue_url, timeout=60,
                              headers={"User-Agent": "literature-agent/0.1"})
             r.raise_for_status()
             if r.content[:5] != b"%PDF-":
@@ -2052,7 +2059,8 @@ def _download_arxiv_by_id(p: PaperMeta, raw_id: str) -> bool:
         except requests.HTTPError:
             return False  # 4xx/5xx不重试
         except Exception:
-            time.sleep(2 * (attempt + 1))
+            # 重试间隔与主下载同步压缩(2026-10-16优化3)
+            time.sleep((1, 2, 4, 4, 4)[attempt])
     return False
 
 
@@ -2164,32 +2172,57 @@ def _arxiv_rescue(p: PaperMeta) -> bool:
     return False
 
 
-def download(papers: list[PaperMeta], max_workers: int = 3) -> list[PaperMeta]:
+def download(papers: list[PaperMeta], max_workers: int = 6,
+             on_downloaded=None) -> list[PaperMeta]:
     """
     并行下载论文PDF到本地 papers/ 目录
 
-    性能说明: 串行下载5篇PDF约需20-40秒(每篇含下载+限速间隔),
-    3线程并行后缩短到约1/3。3个并发对arxiv.org是安全的
-    (它按IP限速,3并发远低于触发阈值;重试机制兜底偶发重置)。
+    性能说明: 串行下载5篇PDF约需20-40秒(每篇含下载+限速间隔)。
+    并行线程2026-10-16由3提到6: 现在只下arXiv托管PDF(成功率近
+    100%), 6并发远低于arxiv.org按IP限速的触发阈值, 5-6篇一波全下。
 
     参数:
         papers: 待下载论文列表
-        max_workers: 并行线程数（3为实测安全值）
+        max_workers: 并行线程数（6为arXiv安全值）
+        on_downloaded: 逐篇完成回调 on_downloaded(paper)——每篇PDF
+            就绪(含"已存在跳过"与救援成功)即触发, 供调用方把提取
+            任务流水线式提前启动(2026-10-16优化1: 下载→提取重叠,
+            提取的等待时间被剩余下载时间吸收)。回调异常不影响下载
 
     返回:
-        下载成功的论文列表（local_path已填充）
+        下载成功的论文列表（local_path已填充, 保持输入顺序）
     """
     os.makedirs(config.PAPER_DIR, exist_ok=True)
 
-    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def _notify(p):
+        """回调包装: 回调自身的异常不能打断下载流程"""
+        if on_downloaded is not None:
+            try:
+                on_downloaded(p)
+            except Exception as e:
+                print(f"[检索Agent] 下载回调异常(忽略): {e}")
 
     downloaded = []
     failed = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # map保持输入顺序; 返回值对应每篇是否成功
-        outcomes = list(executor.map(_download_one, papers))
-        for p, ok in zip(papers, outcomes):
-            (downloaded if ok else failed).append(p)
+        fut_map = {executor.submit(_download_one, p): p for p in papers}
+        for fut in as_completed(fut_map):
+            p = fut_map[fut]
+            if fut.result():
+                downloaded.append(p)
+                # 每篇就绪立即通知(含本地已有PDF直接命中的——这类
+                # 在_download_one里提前return True, 也必须触发提取)
+                _notify(p)
+            else:
+                failed.append(p)
+
+    # 保持输入顺序(as_completed是完成序); 下游去重"保留排名靠前的"
+    # 依赖此顺序, 综合排序前不能改变相对位置
+    if downloaded:
+        order = {id(p): i for i, p in enumerate(papers)}
+        downloaded.sort(key=lambda p: order[id(p)])
 
     # ---- 二次救援: 主链接失败的论文尝试arXiv标题反查 ----
     # 出版社403/HTML落地页的论文，很多在arXiv有预印本副本
@@ -2200,6 +2233,7 @@ def download(papers: list[PaperMeta], max_workers: int = 3) -> list[PaperMeta]:
             budget.check("检索Agent(arXiv救援)")  # 超预算停止救援剩余论文
             if _arxiv_rescue(p):
                 downloaded.append(p)
+                _notify(p)  # 救援成功同样触发提取
 
     print(f"[检索Agent] PDF下载完成: {len(downloaded)}/{len(papers)} 篇"
           f"（含救援成功）")
@@ -2231,7 +2265,12 @@ def _composite_sort(papers: list[PaperMeta]) -> list[PaperMeta]:
     if not papers:
         return papers
     max_rrf = max(p.rrf_score for p in papers) or 1.0
-    max_cited = max(p.cited_by for p in papers)
+    # 影响力基准截断(2026-10-25修复): 引用链挖回的跨领域通用论文
+    # (ResNet被引23万/VGG/Adam)会把max_cited拉爆——领域内经典
+    # (SLAYER被引605)归一化后仅0.52,综合分被压制,终选top_k被
+    # 通用论文霸榜挤掉。被引5000已是任何领域的顶级经典,超过的
+    # 部分不再携带领域相关性信息——以5000为归一化基准截断
+    max_cited = min(max(p.cited_by for p in papers), 5000)
     max_chain = max(p.chain_hits for p in papers)
     for p in papers:
         rrf_norm = p.rrf_score / max_rrf  # 0~1
@@ -2252,7 +2291,7 @@ def _composite_sort(papers: list[PaperMeta]) -> list[PaperMeta]:
 
 def run(plan: SearchPlan, results_per_query: int = 10,
         threshold: float = 4.0, top_k: int | None = None,
-        fast: bool = False) -> list[PaperMeta]:
+        fast: bool = False, on_downloaded=None) -> list[PaperMeta]:
     """
     检索Agent完整流水线: 检索 -> 粗筛 -> 下载
 
@@ -2263,6 +2302,8 @@ def run(plan: SearchPlan, results_per_query: int = 10,
               跳过引用链挖掘与经典注入。首跑耗时约减半(约2-3分钟档),
               代价是奠基经典召回率下降(答辩演示/快速试跑用快速档,
               正式研究用深度档=默认)
+        on_downloaded: 逐篇下载完成回调, 透传给download()——流水线
+              调用方用它实现下载→提取重叠(2026-10-16优化1)
 
     返回:
         list[PaperMeta]，已下载到本地
@@ -2304,13 +2345,15 @@ def run(plan: SearchPlan, results_per_query: int = 10,
     # 新策略: 首批只下top_k+20%余量（余量供下载后去重损耗），
     # 不足时按综合序继续切片补下——papers已排好序，切片即最优补位
     buffer = top_k // 5 + 1
-    downloaded = [p for p in download(papers[:top_k + buffer])
+    downloaded = [p for p in download(papers[:top_k + buffer],
+                                      on_downloaded=on_downloaded)
                   if p.local_path]
     idx = top_k + buffer
     while len(downloaded) < top_k and idx < len(papers):
         shortfall = top_k - len(downloaded)
         need = shortfall + shortfall // 5 + 1  # 补位批同样带20%余量
-        more = [p for p in download(papers[idx:idx + need])
+        more = [p for p in download(papers[idx:idx + need],
+                                    on_downloaded=on_downloaded)
                 if p.local_path]
         downloaded += more
         idx += need
@@ -2329,7 +2372,7 @@ def run(plan: SearchPlan, results_per_query: int = 10,
         # 补位也用综合排序（相关性+RRF+影响力+引用链），与主排序一致
         extra = _composite_sort(extra)[:top_k]
         if extra:
-            more = download(extra)
+            more = download(extra, on_downloaded=on_downloaded)
             downloaded += [p for p in more if p.local_path]
 
     papers = downloaded

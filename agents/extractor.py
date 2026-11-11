@@ -168,7 +168,7 @@ def extract_card(paper: PaperMeta) -> PaperCard | None:
 # ---------------------------------------------------------------
 # 组合入口：批量提取
 # ---------------------------------------------------------------
-def run(papers: list[PaperMeta], max_workers: int = 6) -> list[PaperCard]:
+def run(papers: list[PaperMeta], max_workers: int = 10) -> list[PaperCard]:
     """
     批量提取所有论文的信息卡片，落盘到 data/paper_cards.json
 

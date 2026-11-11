@@ -370,8 +370,8 @@ def run(papers: list[PaperMeta], cards: list[PaperCard]) -> list[ReviewResult]:
         return record
 
     from concurrent.futures import ThreadPoolExecutor
-    # 2026-10-15: 3→6线程, DeepSeek并发可承受, 核验耗时约降一半
-    with ThreadPoolExecutor(max_workers=6) as executor:
+    # 2026-10-16: 6→10线程, DeepSeek并发余量充足, 核验耗时进一步下降
+    with ThreadPoolExecutor(max_workers=10) as executor:
         results = list(executor.map(_verify_one, tasks))
 
     # ---- 落盘 ----

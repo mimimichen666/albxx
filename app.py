@@ -1040,6 +1040,124 @@ with tab0:
         "**LLM领域先验**按标题注入，弥补引用图谱数据缺失。"
     )
 
+    # 🔬 检索透明度面板: 把四路信号的召回与融合过程摆上台面
+    #    （答辩演示用——与贡献点一PPT的架构图逐项对应，数据全部现成）
+    with st.expander("🔬 检索透明度 · 四路信号召回分解", expanded=False):
+        st.caption(
+            "本次检索的完整召回过程：每一路信号各自命中多少、LLM先验注入了谁、"
+            "哪些论文走了免检通道、每篇论文的四信号分值——与架构图一一对应。")
+        # ---- 1) 过程日志解析（子进程print落盘在 pipeline_stdout.log）----
+        n_kw_queries = 0            # 关键词路: 发起的检索次数(每组词×两排序)
+        _chain_done, _snowball = "", ""
+        _prior_inject = {}          # 先验标题 -> 注入环节是否成功(来自日志)
+        _log_path = os.path.join(config.DATA_DIR, "pipeline_stdout.log")
+        if os.path.exists(_log_path):
+            try:
+                with open(_log_path, "r", encoding="utf-8",
+                          errors="ignore") as _f:
+                    for _ln in _f:
+                        if "正在检索:" in _ln:
+                            n_kw_queries += 1
+                        elif "引用链挖掘完成:" in _ln:
+                            _chain_done = _ln.split("引用链挖掘完成:")[-1].strip()[:60]
+                        elif "雪球扩展:" in _ln:
+                            _snowball = _ln.split("雪球扩展:")[-1].strip()[:60]
+                        elif "经典注入: 《" in _ln:
+                            try:
+                                _t = _ln.split("《")[1].split("》")[0]
+                                _prior_inject[_t] = True
+                            except Exception:
+                                pass
+                        elif "经典注入: 未找到《" in _ln:
+                            try:
+                                _t = _ln.split("《")[1].split("》")[0]
+                                _prior_inject[_t] = False
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+        # ---- 2) 论文池统计（四信号字段直接取自 PaperMeta）----
+        n_chain_papers = sum(1 for p in papers if p.chain_hits > 0)
+        exempt = [p for p in papers if p.relevance_score is None]
+        # ---- 3) LLM先验名单：注入环节结果(日志) + 是否入终选(papers匹配) ----
+        classics, injected = [], []
+        _plan_path = os.path.join(config.DATA_DIR, "plan_last.json")
+        if os.path.exists(_plan_path):
+            try:
+                with open(_plan_path, "r", encoding="utf-8") as _f:
+                    classics = (json.load(_f).get("classic_titles") or [])
+            except Exception:
+                pass
+        _norm = lambda s: "".join(ch.lower() for ch in s if ch.isalnum())
+        _pool_titles = [_norm(p.title) for p in papers]
+        for ct in classics:
+            _nc = _norm(ct)
+            hit = next((p.title for p, pt in zip(papers, _pool_titles)
+                        if _nc and (_nc in pt or pt in _nc)), None)
+            # 注入环节结果: 日志里有记录用日志的; 没有则按终选匹配兜底
+            if _prior_inject:
+                inj_ok = next((ok for lt, ok in _prior_inject.items()
+                               if _norm(lt) and (_norm(lt) in _nc
+                                                 or _nc in _norm(lt))), None)
+            else:
+                inj_ok = True if hit else None
+            injected.append((ct, inj_ok, hit))
+
+        _c1, _c2, _c3, _c4 = st.columns(4)
+        _c1.metric("🔑 关键词双路", f"{n_kw_queries} 次检索",
+                   help="每组检索词按被引+相关性各查一次，多词命中享RRF共识加成")
+        _c2.metric("🔗 引用链挖掘", f"{n_chain_papers} 篇命中",
+                   help="被种子论文参考文献共同引用(chain_hits>0)的论文数")
+        _c3.metric("🧠 LLM先验注入",
+                   (f"{sum(1 for _, ok, _ in injected if ok)}/"
+                    f"{len(injected)}" if injected else "—"),
+                   help="规划Agent给出的经典标题反查结果；"
+                        "标题有误会被如实拦截（防编造机制在先验环节同样生效）")
+        _c4.metric("🛡 免检通道", f"{len(exempt)} 篇",
+                   help="共被引≥3的论文跳过LLM粗筛——学术界共识优先于模型打分")
+        if _chain_done or _snowball:
+            st.caption(f"引用链过程: {_chain_done or '—'}"
+                       + (f" ｜ {_snowball}" if _snowball else ""))
+
+        # ---- 4) 四信号分解表（按综合推荐排序，与上方列表一致）----
+        if papers:
+            st.markdown("**每篇论文的四信号分解**（按综合推荐排序）")
+            _rows = ["| # | 论文 | 相关性 | RRF共识 | 被引 | 引用链 | 综合分 |",
+                     "|---|---|---|---|---|---|---|"]
+            for _i, _p in enumerate(
+                    sorted(papers, key=lambda x: x.final_score or 0,
+                           reverse=True), 1):
+                _t = _p.title[:38] + ("…" if len(_p.title) > 38 else "")
+                _rows.append(
+                    f"| {_i} | {_t} | "
+                    f"{_p.relevance_score if _p.relevance_score is not None else '🛡免检'} "
+                    f"| {_p.rrf_score:.3f} | {_p.cited_by} | "
+                    f"{_p.chain_hits} | "
+                    f"{_p.final_score if _p.final_score else '—'} |")
+            st.markdown("\n".join(_rows))
+
+        # ---- 5) 先验注入名单 + 免检名单 ----
+        if injected:
+            st.markdown("**🧠 LLM领域先验名单**（规划Agent给出 → 标题反查 → 终选）")
+            for ct, inj_ok, hit in injected:
+                if inj_ok is False:
+                    st.markdown(
+                        f"- ⚠️ 《{ct[:48]}》→ 反查未收录（疑似标题有误，"
+                        f"已如实拦截，不虚构收录）")
+                elif hit:
+                    st.markdown(f"- ✅ 《{ct[:48]}》→ 注入成功，已入终选")
+                elif inj_ok:
+                    st.markdown(
+                        f"- 🟡 《{ct[:48]}》→ 注入成功进入候选池，"
+                        f"未入本次终选")
+                else:
+                    st.markdown(f"- ❌ 《{ct[:48]}》→ 未入终选")
+        if exempt:
+            st.markdown("**🛡 免检通道名单**（共被引≥3，跳过LLM粗筛）")
+            for p in exempt:
+                st.markdown(
+                    f"- 《{p.title[:52]}》— 被 {p.chain_hits} 篇种子共同引用")
+
     # 排序方式切换（同一份论文池，不同视角的输出方式）
     sort_mode = st.radio(
         "排序方式",
