@@ -41,9 +41,5 @@ test_*.py
 # ---- 与本仓库无关的本地文件 ----
 # .workbuddy/ = IDE工具缓存目录
 # midterm_report/ = 个人中期报告工程（PPT/素材/生成缓存）
-# deploy_pi.py = PuppyPi部署脚本（内含树莓派IP与密码，绝不提交！）
-# laser_tease_dog.py = 树莓派逗狗程序（与文献Agent无关的独立项目）
 .workbuddy/
 midterm_report/
-deploy_pi.py
-laser_tease_dog.py
