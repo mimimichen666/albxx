@@ -97,10 +97,13 @@ OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output") # 综合Agent的产出目录(�
 _env_file = os.path.join(PROJECT_ROOT, ".env")
 if os.path.exists(_env_file):
     # utf-8-sig 自动剥离BOM——部分编辑器保存.env会带BOM，
-    # 导致首行键名变成"\ufeffLLM_API_KEY"而永远匹配失败
+    # 导致首行键名变成"\ufeffLLM_API_KEY"而永远匹配失败。
+    # 另对每行lstrip BOM兜底: 实测编辑器多次保存会累积多个BOM
+    # (utf-8-sig只剥1个, 剩余粘在键名上, 2026-11-18踩坑: 4个连续
+    # BOM导致LLM_API_KEY解析为空, 流水线启动即崩溃)
     with open(_env_file, "r", encoding="utf-8-sig") as f:
         for line in f:
-            line = line.strip()
+            line = line.lstrip("﻿").strip()
             # 跳过注释行和空行
             if not line or line.startswith("#"):
                 continue

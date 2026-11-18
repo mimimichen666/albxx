@@ -73,6 +73,7 @@ if _secrets_file_exists():
 
 import config
 import budget
+import onboarding
 from models import PaperMeta, PaperCard, ReviewResult
 
 # 证据图片目录（方案一：证据链穿透）
@@ -339,10 +340,22 @@ def _alive_worker_pid():
         return None
     try:
         import ctypes
-        h = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
+        import ctypes.wintypes as _wt
+        k32 = ctypes.windll.kernel32
+        # 注意: OpenProcess成功不足以证明存活——沙箱环境下已死进程的PID
+        # 可能被幻影句柄占位(OpenProcess成功但查不到映像名), 会让运行锁
+        # 永久误判"运行中"。必须核实映像名确为python才认定worker存活
+        h = k32.OpenProcess(0x1000, False, pid)
         if h:
-            ctypes.windll.kernel32.CloseHandle(h)
-            return pid
+            try:
+                buf = ctypes.create_unicode_buffer(512)
+                size = _wt.DWORD(512)
+                ok = k32.QueryFullProcessImageNameW(h, 0, buf,
+                                                    ctypes.byref(size))
+                if ok and "python" in os.path.basename(buf.value).lower():
+                    return pid
+            finally:
+                k32.CloseHandle(h)
     except Exception:
         pass
     return None
@@ -634,6 +647,14 @@ with st.sidebar:
     )
     _fast_mode = depth_label.startswith("⚡")
 
+    # S2检索模式状态: 让用户一眼确认密钥是否生效(.env的S2_API_KEY)
+    # 认证模式限流1次/秒独享, 429大幅减少; 匿名模式高峰期容易卡重试
+    if config.S2_API_KEY:
+        st.caption("🔑 S2检索: 认证模式（限流额度独享，稳定）")
+    else:
+        st.caption("🔓 S2检索: 匿名模式（高峰期429频繁，可在.env填"
+                   "S2_API_KEY升级为认证模式）")
+
     col1, col2 = st.columns(2)
     with col1:
         # 运行锁: 防止并发流水线(子进程同时多个会触发API限流)。
@@ -724,12 +745,26 @@ elif _last_state == "done":
         st.rerun()
 
 if not st.session_state.pipeline_done:
-    # 开始检索的页面: 检索一律通过侧边栏流水线发起（用户要求:
-    # 删去无需运行流水线的独立检索入口）
-    st.info("👋 欢迎！请在👈左侧边栏输入研究主题、选择检索方式"
-            "（📌标准 / 🌱入门综述 / 🚀前沿突破 / 🔀交叉领域），"
-            "点击「🚀 完整运行」开始检索并产出带核验的完整综述；"
-            "已有历史产出可点「📂 载入已有结果」直接查看。")
+    # 检索前引导: 画像 → 词云选词 → 术语卡 → 确认启动（onboarding模块）。
+    # 返回非None即用户在引导内确认启动; 引导失败可跳过, 侧边栏快速通道不受影响。
+    # 流水线运行中不渲染引导，避免与顶部进度面板并发操作。
+    # 除会话标志外还须检查跨会话的worker存活状态(PID文件): 新会话的
+    # pipeline_running恒为False, 不检查会让用户填完引导才发现启动被拒
+    if st.session_state.get("pipeline_running") \
+            or _alive_worker_pid() is not None:
+        st.info("⏳ 流水线运行中，进度与终止按钮见页面顶部面板")
+    else:
+        _launch = onboarding.render_onboarding(topic)
+        if _launch:
+            _ok = start_pipeline_subprocess(
+                _launch["topic"], _launch["target_count"],
+                _launch["retrieval_mode"], _launch["mode_years"],
+                fast=_launch["fast"])
+            if _ok:
+                st.session_state.pipeline_running = True
+                st.session_state.pipeline_last_state = None
+                st.session_state.pipeline_last_msg = ""
+            st.rerun()
     st.stop()
 
 # 各标签页共用的数据加载

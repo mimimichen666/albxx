@@ -371,3 +371,37 @@ class HallucinationReport(BaseModel):
         if not self.total_claims:
             return 0.0
         return (self.total_claims - self.llm_errors) / self.total_claims
+
+
+# ===============================================================
+# 6. 检索前引导模块（onboarding）的输出：主题词云
+# ===============================================================
+class GlossaryTerm(BaseModel):
+    """词云中的单个术语条目"""
+    term_en: str = Field(description="英文术语原文，如 surrogate gradient")
+    term_zh: str = Field(description="中文译名，如 代理梯度")
+    weight: int = Field(
+        ge=1, le=10,
+        description="与主题的相关度1-10，10=最核心，决定展示排序",
+    )
+    category: Literal["core", "method", "application", "background"] = Field(
+        description="core=核心概念 method=方法技术 "
+                    "application=应用场景 background=背景知识"
+    )
+    explanation: str = Field(
+        description="不超过80字的中文一句话定义，语言深度跟随用户画像")
+
+    @field_validator("explanation")
+    @classmethod
+    def _cap_explanation(cls, v: str) -> str:
+        return v if len(v) <= 120 else v[:117] + "…"
+
+
+class TopicGlossary(BaseModel):
+    """一次引导词云的完整输出（检索前引导模块）"""
+    topic_en: str = Field(
+        description="研究主题的准确英文翻译，可直接用作流水线检索主题")
+    terms: list[GlossaryTerm] = Field(
+        description="15-25个与主题相关的术语，四类尽量都有覆盖",
+        min_length=8, max_length=25,
+    )
