@@ -87,6 +87,20 @@ def run_pipeline(topic: str, top_k: int, mode: str, years: int,
     from agents import planner, searcher, extractor, reviewer, synthesizer
     from concurrent.futures import ThreadPoolExecutor
 
+    # ---- 读者行文风格（引导流程二期）----
+    # 从run_profile.json读画像身份→综述行文指令; 快速通道无画像或
+    # 文件缺失时为None保持默认学术风格。注: 沿用最近一次引导的画像
+    # (画像本就跨会话持久, 立即重新引导即可覆盖)
+    style_note = None
+    try:
+        profile_path = os.path.join(config.DATA_DIR, "run_profile.json")
+        if os.path.exists(profile_path):
+            with open(profile_path, encoding="utf-8") as f:
+                _profile = json.load(f) or {}
+            style_note = synthesizer.READER_STYLES.get(_profile.get("identity"))
+    except Exception:
+        style_note = None  # 画像读取失败不影响流水线
+
     # ---- 提前启动提取池（2026-10-16优化1: 下载→提取流水线重叠）----
     # 旧流程: 全部PDF下载完才开始提取(串行两段); 新流程: 每篇PDF
     # 落盘立即投入提取线程池, 两段重叠执行——提取的等待时间被剩余
@@ -216,7 +230,7 @@ def run_pipeline(topic: str, top_k: int, mode: str, years: int,
         check_cancel()
         if fast:
             log("综合Agent: 生成综述报告与引用图谱...", stage="综合")
-            synthesizer.run(topic)
+            synthesizer.run(topic, style_note=style_note)
             log("综合Agent完成: 报告+表格+图谱已生成", stage="综合")
             log("⚡快速模式: 跳过矛盾检测", stage="矛盾检测")
             # 落盘空结果, 避免上一主题的conflicts.json残留误导下游展示
@@ -226,7 +240,7 @@ def run_pipeline(topic: str, top_k: int, mode: str, years: int,
             log("综合Agent+矛盾检测: 并行执行中（两者互不依赖）...",
                 stage="综合")
             with ThreadPoolExecutor(max_workers=2) as ex:
-                fut_syn = ex.submit(synthesizer.run, topic)
+                fut_syn = ex.submit(synthesizer.run, topic, style_note)
                 fut_con = ex.submit(conflict_detector.run)
                 fut_syn.result()   # 任一失败异常照常上抛(与原串行一致)
                 conflicts = fut_con.result()

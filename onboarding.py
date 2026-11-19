@@ -20,6 +20,7 @@ import os
 from datetime import datetime
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 import config
 import llm_client
@@ -154,9 +155,131 @@ def _term_explanation(term, edits: dict) -> tuple[str, bool]:
     return term.explanation, False
 
 
+# 词云颜色: 类别→色相（echarts版与HTML降级版共用）
+_CAT_COLORS = {
+    "core": "#1E88E5",        # 蓝
+    "method": "#43A047",      # 绿
+    "application": "#FB8C00",  # 橙
+    "background": "#8E24AA",  # 紫
+}
+_CAT_CN = {"core": "核心概念", "method": "方法技术",
+           "application": "应用场景", "background": "背景知识"}
+
+
+def _render_wordcloud(glossary: TopicGlossary) -> None:
+    """真词云总览（只读可视化，选词走下方词卡）:
+    字号=相关度weight，颜色=类别，悬浮=中英术语+释义。
+    零新依赖: 通过components.html内嵌自包含echarts页面(CDN)；
+    CDN不可达时自动降级为纯HTML span词云，两者都失败仅提示。"""
+    items = []
+    for t in glossary.terms:
+        items.append({
+            "name": t.term_zh,
+            "value": t.weight,
+            "en": t.term_en,
+            "cat": _CAT_CN.get(t.category, t.category),
+            "exp": t.explanation,
+            "color": _CAT_COLORS.get(t.category, "#607D8B"),
+        })
+    data_json = json.dumps(items, ensure_ascii=False)
+    # 双CDN容错: jsdelivr主源失败自动切unpkg备源; wordcloud插件加载
+    # 失败时降级为纯HTML词云。脚本时序: 统一在block3末尾kickoff,
+    # 前置block只负责带加载, 避免引用尚未定义的回调
+    html = f"""
+<div id="wc" style="width:100%;height:320px;"></div>
+<script>
+function __loadScript(src, ok, fail) {{
+  var s = document.createElement('script');
+  s.src = src; s.onload = ok; s.onerror = fail;
+  document.head.appendChild(s);
+}}
+function __loadEcharts(next) {{
+  if (typeof echarts !== 'undefined') {{ next(); return; }}
+  __loadScript('https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js',
+    next,
+    function() {{ __loadScript(
+      'https://unpkg.com/echarts@5.5.0/dist/echarts.min.js', next, next); }});
+}}
+function __loadPlugin(next) {{
+  __loadScript(
+    'https://cdn.jsdelivr.net/npm/echarts-wordcloud@2.1.0/dist/echarts-wordcloud.min.js',
+    next,
+    function() {{ __loadScript(
+      'https://unpkg.com/echarts-wordcloud@2.1.0/dist/echarts-wordcloud.min.js',
+      next,
+      function() {{ window.__wcPluginFailed = true; next(); }}); }});
+}}
+</script>
+<script>
+var __DATA = {data_json};
+window.__wcFallback = function() {{
+  // CDN全失败 → 纯HTML降级词云(字号=相关度, 无布局算法)
+  var el = document.getElementById('wc');
+  el.style.lineHeight = '2.2';
+  el.style.textAlign = 'center';
+  __DATA.forEach(function(d) {{
+    var sp = document.createElement('span');
+    sp.style.cssText = 'font-size:' + (13 + d.value * 3) + 'px;color:'
+      + d.color + ';margin:0 6px;cursor:default';
+    sp.title = d.en + ' | ' + d.cat + ' · 相关度 ' + d.value + '/10\\n' + d.exp;
+    sp.textContent = d.name;
+    el.appendChild(sp);
+  }});
+}};
+window.__wcInit = function() {{
+  try {{
+    var chart = echarts.init(document.getElementById('wc'), null,
+                             {{renderer: 'canvas'}});
+    chart.setOption({{
+      backgroundColor: 'transparent',
+      tooltip: {{
+        textStyle: {{fontSize: 12}},
+        formatter: function(p) {{
+          return '<b>' + p.name + '</b> (' + p.data.en + ')<br/>'
+            + p.data.cat + ' · 相关度 ' + p.value + '/10<br/>'
+            + p.data.exp;
+        }}
+      }},
+      series: [{{
+        type: 'wordCloud',
+        shape: 'circle',
+        left: 'center', top: 'center',
+        width: '96%', height: '96%',
+        sizeRange: [14, 42],
+        rotationRange: [0, 0],
+        gridSize: 8,
+        drawOutOfBound: false,
+        layoutAnimation: true,
+        textStyle: {{fontFamily: 'sans-serif'}},
+        data: __DATA.map(function(d) {{
+          return {{name: d.name, value: d.value,
+                  en: d.en, cat: d.cat, exp: d.exp,
+                  textStyle: {{color: d.color}}}};
+        }})
+      }}]
+    }});
+  }} catch (e) {{ window.__wcFallback(); }}
+}};
+__loadEcharts(function() {{
+  if (typeof echarts === 'undefined') {{ window.__wcFallback(); return; }}
+  __loadPlugin(function() {{
+    if (window.__wcPluginFailed) {{ window.__wcFallback(); return; }}
+    window.__wcInit();
+  }});
+}});
+</script>"""
+    try:
+        components.html(html, height=340, scrolling=False)
+    except Exception:
+        pass  # 组件沙箱异常不影响词卡列表
+    st.caption("词云只读展示：字号=相关度，颜色=类别（🔵核心 🟢方法 🟠应用 🟣背景）；"
+               "悬浮查看释义，**选词请点下方词卡**")
+
+
 def _render_cloud(glossary: TopicGlossary, edits: dict) -> list[str]:
     """词云: 按分类分组的词卡网格，返回当前已选术语列表"""
     st.caption(f"主题英译将用于检索: `{glossary.topic_en}`")
+    _render_wordcloud(glossary)
     selected: list = st.session_state.get("ob_selected", [])
     for cat_key, cat_label in CATEGORY_LABELS:
         terms = sorted(

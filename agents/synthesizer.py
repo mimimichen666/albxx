@@ -282,15 +282,29 @@ SYNTH_SYSTEM_PROMPT = """你是一位严谨的学术综述撰写者。
 3. 提及具体工作时用 [arXiv:编号] 标注，如 "SPIDE [arXiv:2302.00232]"
 4. 末尾给出一段"趋势与开放问题"的总结（基于给定信息的合理推断，
    推断性语句用"可能/似乎"等限定词）
-5. 篇幅400-600字
+5. 篇幅400-600字（若用户消息中另有读者篇幅要求，以用户消息为准）
 """
+
+# 引导流程画像身份 → 综述行文风格（onboarding落盘run_profile.json,
+# pipeline_worker读取后注入; 快速通道无画像时为None保持原行为）
+READER_STYLES = {
+    "本科生": ("目标读者是本科生初学者：首次出现的术语用一句话通俗解释，"
+              "多用类比，段落更短，篇幅放宽至600-800字"),
+    "硕士生": "目标读者是硕士研究生：标准学术行文，机制与用途并重",
+    "博士生": ("目标读者是博士研究生：高信息密度，突出技术脉络、"
+              "方法间对比与开放问题"),
+    "研究者": "目标读者是资深研究者：直入技术细节，弱化背景铺垫",
+    "工程师": ("目标读者是工程师：强调各方法的工程代价、适用条件"
+              "与落地效果"),
+}
 
 
 def build_report(topic: str, cards: list[PaperCard],
                  verified: dict[str, list],
                  reviews: list[ReviewResult],
                  table_md: str, graph_path: str,
-                 evidence_index: dict | None = None) -> str:
+                 evidence_index: dict | None = None,
+                 style_note: str | None = None) -> str:
     """
     生成最终Markdown综述报告（LLM撰写正文 + 程序拼接统计与附录）
 
@@ -313,8 +327,9 @@ def build_report(topic: str, cards: list[PaperCard],
 
     body = llm_client.chat(
         [{"role": "system", "content": SYNTH_SYSTEM_PROMPT},
-         {"role": "user", "content": f"研究主题: {topic}\n\n" +
-          "\n\n".join(material)}],
+         {"role": "user", "content": f"研究主题: {topic}\n\n"
+          + (f"读者与行文要求: {style_note}\n\n" if style_note else "")
+          + "\n\n".join(material)}],
         temperature=config.TEMP_SYNTHESIZER,
     )
 
@@ -423,9 +438,11 @@ def build_report(topic: str, cards: list[PaperCard],
 # ---------------------------------------------------------------
 # 组合入口
 # ---------------------------------------------------------------
-def run(topic: str) -> dict:
+def run(topic: str, style_note: str | None = None) -> dict:
     """
     综合Agent完整流水线: 加载数据 -> 表格 -> 图谱 -> 报告
+
+    style_note: 读者行文风格指令（引导流程画像注入；None=默认学术风格）
 
     返回:
         dict(各产出文件路径)
@@ -446,7 +463,7 @@ def run(topic: str) -> dict:
     table_md = build_table(cards, verified)
     graph_path = build_graph(papers, cards)
     build_report(topic, cards, verified, reviews, table_md, graph_path,
-                 evidence_index=evidence_index)
+                 evidence_index=evidence_index, style_note=style_note)
 
     return {
         "table": os.path.join(OUTPUT_DIR, "review_table.md"),
