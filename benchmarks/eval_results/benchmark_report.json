@@ -1,0 +1,2030 @@
+{
+  "total_cases": 220,
+  "verdict_correct": 152,
+  "alignment_correct": 219,
+  "supported_cases": 132,
+  "unsupported_cases": 52,
+  "contradicted_cases": 36,
+  "verdict_accuracy": 0.6909090909090909,
+  "alignment_accuracy": 0.9954545454545455,
+  "macro_f1": 0.5588542531356563,
+  "results": [
+    {
+      "case_id": "S001_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S002_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S003_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S004_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S005_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S006_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S007_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S008_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S009_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S010_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S011_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S012_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S013_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S014_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S015_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S016_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S017_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S018_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S019_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S020_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S021_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S022_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S023_verbatim",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S025_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S026_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S027_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S028_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S029_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S030_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S031_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S032_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S033_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S034_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S035_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S036_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S037_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S038_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S039_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S040_verbatim",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S041_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S042_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S043_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S044_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S045_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S046_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S047_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S048_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S049_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S050_verbatim",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S051_flip",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S052_flip",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S053_flip",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S054_flip",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S055_flip",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S056_flip",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S057_flip",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S058_flip",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S059_flip",
+      "predicted_verdict": "contradicted",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S060_flip",
+      "predicted_verdict": "contradicted",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S061_flip",
+      "predicted_verdict": "contradicted",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S062_flip",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S063_flip",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S064_flip",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S065_flip",
+      "predicted_verdict": "contradicted",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S066_flip",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S067_flip",
+      "predicted_verdict": "contradicted",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S068_paraphrase",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S069_flip",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S070_nummask",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S071_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S072_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S073_nummask",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S074_nummask",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S075_nummask",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S076_nummask",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S077_flip",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S078_flip",
+      "predicted_verdict": "contradicted",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S079_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S080_nummask",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S081_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S082_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S083_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S084_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S085_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S086_blend",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S087_blend",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S088_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S089_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S090_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S091_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S092_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S093_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S094_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S095_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S096_blend",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S097_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S098_blend",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S099_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S100_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S101_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S102_blend",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S103_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S104_blend",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S105_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S106_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S107_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S108_blend",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S109_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S110_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S111_blend",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S112_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S113_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S114_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S115_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S116_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S117_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S118_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S119_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S120_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S121_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S122_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S123_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S124_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S125_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S126_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S127_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S128_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S129_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S130_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S131_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S132_nummask",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S133_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S134_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S135_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S136_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S137_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S138_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S139_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S140_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S141_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S142_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S143_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S144_fakequote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "S145_hyphen",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S146_hyphen",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S147_hyphen",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S148_hyphen",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S149_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S150_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S151_nummask",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S152_hyphen",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S153_hyphen",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S154_hyphen",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S155_hyphen",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S156_hyphen",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S157_hyphen",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S158_nummask",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S159_nummask",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S160_nummask",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": false,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S161_nummask",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S162_nummask",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S163_nummask",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S164_paraphrase",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S165_paraphrase",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S166_paraphrase",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S167_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S168_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S169_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S170_nummask",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S171_nummask",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S172_nummask",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S173_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S174_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S175_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S176_nummask",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S177_paraphrase",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S178_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S179_nummask",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S180_nummask",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S181_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S182_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S183_paraphrase",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S184_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S185_numtap",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S186_paraphrase",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S187_numtap",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S188_numtap",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S189_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S190_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S191_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S192_numtap",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S193_numtap",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S194_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S195_paraphrase",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S196_numtap",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S197_numtap",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S198_numtap",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S199_numtap",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "S200_numtap",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "A1_method_exact",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "A2_number_contradicted",
+      "predicted_verdict": "contradicted",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "A3_scope_expansion",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "A4_case_insensitive_quote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "A5_rounding_contradicted",
+      "predicted_verdict": "contradicted",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "B1_hyphen_fuzzy",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "B2_fake_quote_number",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "B3_condition_match",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "C1_short_numeric_quote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "C2_short_numeric_fake",
+      "predicted_verdict": "contradicted",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "C3_protocol_supported",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "D1_formula_exact",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "D2_hyperparam_contradicted",
+      "predicted_verdict": "contradicted",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "D3_surrogate_supported",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "E1_prove_vs_propose",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "unsupported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "E2_limitation_supported",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "E3_comparison_supported",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "F1_multisentence_exact",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "F2_timestep_contradicted",
+      "predicted_verdict": "unsupported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": false,
+      "alignment_correct": true,
+      "gold_verdict": "contradicted",
+      "gold_quote_alignment": true
+    },
+    {
+      "case_id": "F3_paraphrase_quote",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": false,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": false
+    },
+    {
+      "case_id": "F4_augmentation_condition",
+      "predicted_verdict": "supported",
+      "predicted_quote_alignment": true,
+      "verdict_correct": true,
+      "alignment_correct": true,
+      "gold_verdict": "supported",
+      "gold_quote_alignment": true
+    }
+  ],
+  "precision": {
+    "supported": 0.7515527950310559,
+    "unsupported": 0.42857142857142855,
+    "contradicted": 1.0
+  },
+  "recall": {
+    "supported": 0.9166666666666666,
+    "unsupported": 0.40384615384615385,
+    "contradicted": 0.2777777777777778
+  },
+  "f1": {
+    "supported": 0.825938566552901,
+    "unsupported": 0.4158415841584159,
+    "contradicted": 0.4347826086956522
+  },
+  "false_pass_rate": 0.33613445378151263,
+  "errored_cases": 1,
+  "confidence_intervals": {
+    "verdict_accuracy": [
+      0.6273,
+      0.7545
+    ],
+    "alignment_accuracy": [
+      0.9864,
+      1.0
+    ],
+    "macro_f1": [
+      0.4742,
+      0.6404
+    ],
+    "false_pass_rate": [
+      0.2542,
+      0.4215
+    ],
+    "n_boot": 2000,
+    "note": "95% bootstrap CI (percentile method)"
+  }
+}
