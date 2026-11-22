@@ -648,6 +648,13 @@ def run_d_benchmark(cases: list["BenchmarkCase"],
             print(f"  ⚠ [{case.case_id}] 语义核验调用失败，跳过该样本: {e}")
             errored_ids.append(case.case_id)
             continue
+        if verdict == "abstained":
+            # 协议口径: 证据不足的暂缓绝不计为幻觉也不评测
+            # （"核验失败"和"证实造假"是两回事），计errored跳过
+            print(f"  ⚠ [{case.case_id}] 语义核验全部原子事实暂缓"
+                  f"(abstained)，跳过该样本")
+            errored_ids.append(case.case_id)
+            continue
         kept_cases.append(case)
 
         results.append(BenchmarkResult(
