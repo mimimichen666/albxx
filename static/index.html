@@ -274,8 +274,8 @@ iframe { width: 100%; height: 540px; border: 1px solid var(--border); border-rad
 /* 弹层（证据穿透） */
 #modal { position: fixed; inset: 0; background: rgba(15,23,42,.48); z-index: 50;
   display: flex; align-items: center; justify-content: center; padding: 16px; }
-#modal .box { background: #fff; border-radius: 14px; max-width: 760px; width: 100%;
-  max-height: 84vh; overflow-y: auto; padding: 18px 20px; box-shadow: var(--shadow-lg); }
+#modal .box { background: #fff; border-radius: 16px; max-width: 920px; width: 100%;
+  max-height: 92vh; overflow-y: auto; padding: 22px 26px; box-shadow: var(--shadow-lg); }
 #modal h3 { font-size: 14.5px; margin-bottom: 8px; }
 #modal img { max-width: 100%; border: 1px solid var(--border); border-radius: 8px;
   margin: 8px 0; }
@@ -357,34 +357,109 @@ iframe { width: 100%; height: 540px; border: 1px solid var(--border); border-rad
 .vmiss { font-size: 12px; color: var(--amber); background: var(--amber-lt);
   border-radius: 6px; padding: 6px 10px; margin-top: 10px; }
 
-/* ---- 检索前引导（词云向导） ---- */
+/* ---- 检索前引导（词云向导 · 旅程式设计 v2） ---- */
 #btn-ob { width: 100%; margin-top: 10px; background: var(--card); border: 1px solid var(--border);
   color: var(--brand); border-radius: 10px; padding: 10px 12px; font-size: 13px;
   cursor: pointer; font-family: inherit; }
 #btn-ob:hover { border-color: var(--brand); background: var(--brand-lt); }
-.ob-stepbar { display: flex; gap: 6px; margin-bottom: 14px; }
-.ob-step { flex: 1; text-align: center; font-size: 11.5px; color: var(--muted);
-  padding: 5px 2px; border-radius: 6px; background: var(--bg); }
-.ob-step.on { background: var(--brand-lt); color: var(--brand); font-weight: 600; }
+/* ---- 初次用户引导提示（4秒无输入时弹一次；fixed 定位 + 视口收拢，绝不被遮挡） ---- */
+.nudge-pop { position: fixed; z-index: 120; width: 272px; background: var(--card);
+  border: 1.5px solid var(--brand); border-radius: 12px; padding: 15px 17px;
+  font-size: 13.5px; line-height: 1.65; color: var(--ink);
+  box-shadow: 0 10px 34px rgba(30, 30, 80, .2); }
+.nudge-pop b { color: var(--brand); font-size: 14px; }
+.nudge-row { display: flex; gap: 8px; margin-top: 10px; }
+.nudge-btn { flex: 1; border: none; border-radius: 9px; padding: 8px 10px; font-size: 13px;
+  cursor: pointer; font-family: inherit; font-weight: 600;
+  background: var(--brand-grad); color: #fff; }
+.nudge-btn.ghost { background: var(--card); border: 1px solid var(--border);
+  color: var(--slate); font-weight: 400; }
+.nudge-tip { position: fixed; z-index: 120; white-space: nowrap; cursor: pointer;
+  background: var(--brand); color: #fff; border-radius: 999px; padding: 6px 15px;
+  font-size: 13px; font-weight: 600;
+  box-shadow: 0 6px 18px rgba(79, 70, 229, .3);
+  animation: nudge-bob 1.2s ease-in-out infinite; }
+@keyframes nudge-bob { 0%, 100% { transform: translateX(0); }
+                       50% { transform: translateX(-6px); } }
+@media (prefers-reduced-motion: reduce) { .nudge-tip { animation: none; } }
+#modal .box { position: relative; }
+.ob-close { position: absolute; top: 14px; right: 14px; width: 30px; height: 30px;
+  border: 1px solid var(--border); background: var(--card); border-radius: 50%;
+  color: var(--muted); font-size: 14px; cursor: pointer; z-index: 5; line-height: 1; }
+.ob-close:hover { color: var(--ink); border-color: var(--slate); }
+/* 弹窗头部品牌区 */
+.ob-hero { display: flex; gap: 12px; align-items: center; padding-right: 40px; margin-bottom: 16px; }
+.ob-hero-ic { width: 42px; height: 42px; border-radius: 12px; background: var(--brand-grad);
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex: none; }
+.ob-hero h3 { margin: 0; font-size: 16px; color: var(--ink); }
+.ob-hero p { margin: 3px 0 0; font-size: 12px; color: var(--muted); }
+/* 旅程步进条：圆点 + 连接线 + 双行文案 */
+.ob-journey { display: flex; align-items: flex-start; margin: 2px 0 18px; }
+.ob-jnode { flex: 1; text-align: center; position: relative; }
+.ob-jnode::before { content: ""; position: absolute; top: 13px; left: -50%;
+  width: 100%; height: 2px; background: var(--border); z-index: 0; }
+.ob-jnode:first-child::before { display: none; }
+.ob-jnode.done::before { background: var(--brand); }
+.ob-jdot { width: 26px; height: 26px; border-radius: 50%; margin: 0 auto 6px;
+  display: flex; align-items: center; justify-content: center; font-size: 12px;
+  font-weight: 700; position: relative; z-index: 1; background: var(--bg);
+  color: var(--muted); border: 2px solid var(--border); }
+.ob-jnode.cur .ob-jdot { background: var(--brand-grad); color: #fff;
+  border-color: transparent; box-shadow: 0 0 0 4px var(--brand-lt); }
+.ob-jnode.done .ob-jdot { background: var(--brand-lt); color: var(--brand);
+  border-color: var(--brand); }
+.ob-jtitle { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.ob-jnode.cur .ob-jtitle { color: var(--brand); }
+.ob-jnode.done .ob-jtitle { color: var(--ink); }
+.ob-jsub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+/* 步骤切换动画（仅换步时触发，避免选词重渲染闪动） */
+.ob-anim { animation: obIn .28s ease both; }
+@keyframes obIn { from { opacity: 0; transform: translateY(10px); }
+                  to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ob-anim { animation: none; } }
+/* 药丸选择器（身份/阶段） */
+.ob-pillgrp { display: flex; gap: 8px; flex-wrap: wrap; }
+.ob-pillbtn { border: 1px solid var(--border); background: var(--card); border-radius: 999px;
+  padding: 7px 14px; font-size: 12.5px; cursor: pointer; font-family: inherit;
+  color: var(--slate); transition: border-color .15s, background .15s, color .15s; }
+.ob-pillbtn:hover { border-color: var(--brand); color: var(--brand); }
+.ob-pillbtn.on { background: var(--brand-lt); border-color: var(--brand);
+  color: var(--brand); font-weight: 600; }
+.ob-preset { font-size: 11.5px; color: var(--brand); background: var(--brand-lt);
+  border-radius: 8px; padding: 6px 10px; margin-top: 8px; display: inline-block; }
+/* 词云区图例 */
+.ob-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.ob-legend span { font-size: 11px; color: var(--slate); display: flex;
+  align-items: center; gap: 4px; }
+.ob-legend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .ob-field { margin-bottom: 12px; }
 .ob-field label { display: block; font-size: 12px; color: var(--slate); margin-bottom: 5px; }
 .ob-field textarea, .ob-field select, .ob-field input { width: 100%; border: 1px solid var(--border);
   border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit;
   background: var(--card); color: var(--ink); }
 .ob-field textarea { min-height: 56px; resize: vertical; }
+.ob-field textarea:focus, .ob-field select:focus, .ob-field input:focus {
+  outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-lt); }
 .ob-actions { display: flex; gap: 8px; margin-top: 14px; }
 .ob-btn { border: none; background: var(--brand-grad); color: #fff; border-radius: 10px;
-  padding: 10px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  padding: 10px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+  transition: opacity .15s, transform .15s; }
+.ob-btn:hover { opacity: .92; }
+.ob-btn:active { transform: scale(.98); }
 .ob-btn:disabled { opacity: .5; cursor: not-allowed; }
 .ob-btn.ghost { background: var(--card); border: 1px solid var(--border); color: var(--slate);
   font-weight: 400; }
+.ob-btn.ghost:hover { border-color: var(--brand); color: var(--brand); opacity: 1; }
 .ob-spherewrap { margin-bottom: 14px; }
-.ob-sphere { position: relative; height: 300px; border-radius: 12px;
+.ob-sphere { position: relative; height: 360px; border-radius: 12px;
   background: radial-gradient(circle at 50% 42%, var(--brand-lt), transparent 70%), var(--bg);
+  border: 1px solid var(--border);
   overflow: hidden; touch-action: none; cursor: grab; }
 .ob-sphere:active { cursor: grabbing; }
 .ob-word { position: absolute; left: 0; top: 0; white-space: nowrap; cursor: pointer;
-  will-change: transform, opacity; user-select: none; font-weight: 600; }
+  will-change: transform, opacity; user-select: none; font-weight: 600;
+  transition: filter .2s; }
 .ob-word.picked { text-decoration: line-through; filter: saturate(.4); }
 .ob-word.focus { text-shadow: 0 0 14px currentColor; }
 .ob-spherehint { text-align: center; font-size: 11px; color: var(--muted); margin-top: 6px; }
@@ -394,14 +469,18 @@ iframe { width: 100%; height: 540px; border: 1px solid var(--border); border-rad
   padding: 3px 11px; margin: 0 6px 6px 0; font-size: 12.5px; cursor: pointer;
   background: var(--card); color: var(--ink); }
 .ob-pill.on { border-color: currentColor; font-weight: 600; background: var(--brand-lt); }
-.ob-termcard { background: var(--bg); border-radius: 8px; padding: 12px 14px; font-size: 12.5px;
+.ob-termcard { background: var(--bg); border-radius: 10px; padding: 12px 14px; font-size: 12.5px;
   line-height: 1.6; color: var(--slate); margin-bottom: 12px; }
 .ob-termcard b { color: var(--ink); }
-.ob-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ob-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
 .ob-chip { background: var(--brand-lt); color: var(--brand); border-radius: 999px;
   padding: 2px 10px; font-size: 11.5px; }
-.ob-preview { background: var(--bg); border-radius: 8px; padding: 10px 12px; font-size: 12.5px;
-  color: var(--slate); margin-bottom: 12px; line-height: 1.6; }
+.ob-preview { background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; font-size: 13px; color: var(--slate); margin-bottom: 12px; line-height: 1.6; }
+.ob-preview b { color: var(--ink); }
+.ob-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.ob-est { font-size: 12px; color: var(--slate); background: var(--bg); border-radius: 8px;
+  padding: 8px 12px; margin-top: 10px; line-height: 1.6; }
 
 /* ---- 结果中转页（引导关键词 ↔ 论文关联 + 分流） ---- */
 .br-kwrow { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
@@ -697,7 +776,7 @@ $("#btn-run").onclick = async () => {
 /* ---------------- 检索前引导（词云向导） ---------------- */
 const OB = { step: 1, topic: "", identity: "硕士生", stage: "入门了解", focus: "",
              glossary: null, sel: new Set(), openTerm: -1, loading: false,
-             final: null, focusTerms: null };
+             final: null, focusTerms: null, lastStep: 0 };
 const OB_STAGES = ["入门了解", "开题调研", "正式综述", "追前沿", "交叉探索"];
 const OB_PRESET = {
   "入门了解": { mode: "mode1", fast: true,  top_k: 5,  years: 2 },
@@ -712,9 +791,23 @@ const OB_CAT = {
   application: { label: "应用场景 · 用在哪里", color: "#D97706" },
   background:  { label: "背景知识 · 为什么重要", color: "#7C3AED" }
 };
-const OB_BAR = ["① 主题画像", "② 词云选词", "③ 确认启动"];
+const OB_BAR = [
+  {t: "描述主题", s: "告诉我们你的研究方向"},
+  {t: "挑选关注词", s: "从专属词云选出重点"},
+  {t: "确认启动", s: "核对方案，一键开跑"},
+];
+const OB_MODE_LABEL = {standard: "标准", mode1: "入门综述", mode2: "前沿突破", mode3: "交叉领域"};
 
 function closeModal() { obSphereStop(); $("#modal").classList.add("hidden"); }
+function obPresetText() {
+  const p = OB_PRESET[OB.stage] || OB_PRESET["开题调研"];
+  return `已按「${esc(OB.stage)}」预设：${OB_MODE_LABEL[p.mode] || p.mode}模式 · ${p.top_k} 篇 · 近 ${p.years} 年${p.fast ? " · 快速" : ""}`;
+}
+function obEstimate() {
+  const f = OB.final;
+  const min = f.fast ? 3 : (f.top_k <= 6 ? 8 : f.top_k <= 10 ? 15 : 25);
+  return `⏱ 预计耗时约 ${min} 分钟${f.fast ? "（快速模式）" : ""} · 期间页面可关闭，任务在后台继续`;
+}
 
 /* ---- 3D 词云球：斐波那契球面分布 + 深度投影 + 拖拽/悬停交互 ---- */
 let obRaf = 0;
@@ -781,40 +874,59 @@ function openObWizard() {
   OB.step = 1; OB.topic = $("#topic").value.trim()
     .replace(/[（(]重点关注[:：].*?[）)]/g, "").trim();
   OB.glossary = null;
-  OB.sel = new Set(); OB.openTerm = -1; OB.loading = false; OB.final = null; OB.focusTerms = null;
+  OB.sel = new Set(); OB.openTerm = -1; OB.loading = false; OB.final = null; OB.focusTerms = null; OB.lastStep = 0;
   $("#modal-box").innerHTML = '<div id="ob-body"></div>';
   $("#modal").classList.remove("hidden");
   obRender();
 }
 function obBar() {
-  return `<div class="ob-stepbar">${OB_BAR.map((s, i) =>
-    `<div class="ob-step ${OB.step === i + 1 ? "on" : ""}">${s}</div>`).join("")}</div>`;
+  return `<div class="ob-hero">
+      <div class="ob-hero-ic">🧭</div>
+      <div><h3>智能检索引导</h3>
+        <p>3 步生成你的专属文献综述方案 · 无需任何专业知识</p></div></div>
+    <button type="button" class="ob-close" title="关闭" onclick="closeModal()">✕</button>
+    <div class="ob-journey">${OB_BAR.map((s, i) => {
+      const st = OB.step === i + 1 ? "cur" : (OB.step > i + 1 ? "done" : "");
+      return `<div class="ob-jnode ${st}">
+        <div class="ob-jdot">${OB.step > i + 1 ? "✓" : i + 1}</div>
+        <div class="ob-jtitle">${s.t}</div><div class="ob-jsub">${s.s}</div></div>`;
+    }).join("")}</div>`;
 }
-function obSelHtml(id, opts, cur, onchange) {
-  return `<select onchange="${onchange}">${opts.map(o =>
-    `<option value="${o}"${o === cur ? " selected" : ""}>${o}</option>`).join("")}</select>`;
+function obPillGroup(opts, cur, target) {
+  return `<div class="ob-pillgrp">${opts.map(o =>
+    `<button type="button" class="ob-pillbtn ${o === cur ? "on" : ""}"
+      onclick="${target}='${o}';obRender()">${o}</button>`).join("")}</div>`;
 }
 function obRender() {
   const el = $("#ob-body");
   if (!el) return;
+  // 防御：Step 2 需要词云数据，缺失（如异常状态）时回退 Step 1，避免整页报错
+  if (OB.step === 2 && !OB.glossary) OB.step = 1;
+  // 药丸选择会触发重渲染：先回收输入框里未提交的主题，避免用户输入丢失
+  const curTopic = $("#ob-topic");
+  if (curTopic && !OB.loading) OB.topic = curTopic.value;
   if (OB.step !== 2) obSphereStop();
+  // 仅换步时播放入场动画，选词等重渲染不闪动
+  const anim = OB.lastStep !== OB.step ? `<div class="ob-anim">` : `<div>`;
+  OB.lastStep = OB.step;
   if (OB.step === 1) {
-    el.innerHTML = `${obBar()}
+    el.innerHTML = `${obBar()}${anim}
       <div class="ob-field"><label>研究主题</label>
         <textarea id="ob-topic" placeholder="例如：脉冲神经网络的高效训练方法">${esc(OB.topic)}</textarea></div>
       <div class="ob-field"><label>你的身份（影响术语解释的讲法）</label>
-        ${obSelHtml("ob-id", ["本科生", "硕士生", "博士生", "研究者", "工程师"], OB.identity, "OB.identity=this.value")}</div>
+        ${obPillGroup(["本科生", "硕士生", "博士生", "研究者", "工程师"], OB.identity, "OB.identity")}</div>
       <div class="ob-field"><label>当前阶段（决定检索预设）</label>
-        ${obSelHtml("ob-stage", OB_STAGES, OB.stage, "OB.stage=this.value")}</div>
+        ${obPillGroup(OB_STAGES, OB.stage, "OB.stage")}
+        <div class="ob-preset">${obPresetText()}</div></div>
       <div class="ob-field"><label>关注侧重（可选）</label>
         <input id="ob-focus" value="${esc(OB.focus)}" placeholder="例如：关注硬件实现"
                oninput="OB.focus=this.value"></div>
       <div class="ob-actions">
-        <button class="ob-btn" id="ob-gen" onclick="obGenerate()"
-                ${OB.loading ? "disabled" : ""}>${OB.loading ? "🪄 生成中…" : "🪄 生成引导词云"}</button>
+        <button class="ob-btn grow" id="ob-gen" onclick="obGenerate()"
+                ${OB.loading ? "disabled" : ""}>${OB.loading ? "🪄 生成中…" : "🪄 生成我的专属词云"}</button>
         ${OB.loading ? `<button class="ob-btn ghost" onclick="obCancelGen()">✖ 取消</button>` : ""}
         <button class="ob-btn ghost" onclick="closeModal()">跳过引导</button></div>
-      ${OB.error ? `<div class="ob-preview">⚠️ ${esc(OB.error)}——可直接跳过引导，用左侧表单检索</div>` : ""}`;
+      ${OB.error ? `<div class="ob-preview">⚠️ ${esc(OB.error)}——可直接跳过引导，用左侧表单检索</div>` : ""}</div>`;
     if (!OB.loading) $("#ob-topic").value = OB.topic;
     return;
   }
@@ -839,7 +951,7 @@ function obRender() {
           ${esc(x.t.term_zh)} ${esc(x.t.term_en)}</span>`).join("")}</div>`;
     }).join("");
     const t = OB.openTerm >= 0 ? terms[OB.openTerm] : null;
-    const card = t ? `<div class="ob-termcard">
+    const card = t ? `<div class="ob-termcard" style="border-left:4px solid ${catOf(t).color}">
         <b>${esc(t.term_zh)} · ${esc(t.term_en)}</b>
         <span style="color:${catOf(t).color}">［${(catOf(t).label || "术语").split(" · ")[0]} · 相关度 ${t.weight}/10］</span><br>
         ${esc(t.explanation)}<br>
@@ -848,7 +960,10 @@ function obRender() {
           ${OB.sel.has(OB.openTerm) ? "✓ 已加入检索词（点击移除）" : "＋ 加入检索词"}</button></div>`
       : `<div class="ob-termcard">👆 点击任意词查看解释，选中后将与主题一起进入检索规划</div>`;
     const chips = [...OB.sel].map(i => `<span class="ob-chip">${esc(terms[i].term_zh)}</span>`).join("");
-    el.innerHTML = `${obBar()}
+    const legend = Object.keys(OB_CAT).map(c =>
+      `<span><i style="background:${OB_CAT[c].color}"></i>${OB_CAT[c].label.split(" · ")[0]}</span>`).join("");
+    el.innerHTML = `${obBar()}${anim}
+      <div class="ob-legend">${legend}</div>
       <div class="ob-spherewrap">
         <div class="ob-sphere" id="ob-sphere">${cloud}</div>
         <div class="ob-spherehint">🖱 拖拽旋转 · 悬停暂停 · 点击词看解释 · 划线=已选</div>
@@ -856,14 +971,14 @@ function obRender() {
       <div class="ob-chips">${OB.sel.size ? `已选 ${OB.sel.size} 个：${chips}` : "未选词也可继续（仅用主题检索）"}</div>
       <div class="ob-actions">
         <button class="ob-btn ghost" onclick="OB.step=1;OB.error='';obRender()">← 上一步</button>
-        <button class="ob-btn" onclick="OB.step=3;obEnterConfirm()">下一步：确认启动 →</button></div>`;
+        <button class="ob-btn grow" onclick="OB.step=3;obEnterConfirm()">下一步：确认启动${OB.sel.size ? `（已选 ${OB.sel.size} 词）` : ""} →</button></div></div>`;
     obSphereInit();
     return;
   }
   // step 3
   const f = OB.final, names = [...OB.sel].map(i => OB.glossary.terms[i].term_zh);
   const finalTopic = OB.topic + (names.length ? `（重点关注：${names.join("；")}）` : "");
-  el.innerHTML = `${obBar()}
+  el.innerHTML = `${obBar()}${anim}
     <div class="ob-preview"><b>最终检索主题</b><br>${esc(finalTopic)}
       ${OB.focus ? `<br>关注侧重：${esc(OB.focus)}` : ""}</div>
     <div class="ob-field"><label>检索模式（已按「${esc(OB.stage)}」预设，可修改）</label>
@@ -871,14 +986,20 @@ function obRender() {
         ${[["standard", "📌 标准（推荐）"], ["mode1", "🌱 入门综述模式"], ["mode2", "🚀 前沿突破模式"], ["mode3", "🔀 交叉领域模式"]]
           .map(([v, l]) => `<option value="${v}"${f.mode === v ? " selected" : ""}>${l}</option>`).join("")}
       </select></div>
-    <div class="ob-field"><label>篇数</label>
-      <input id="ob-fk" type="number" value="${f.top_k}" min="3" max="20"></div>
-    <div class="ob-field"><label>年限</label>
-      <input id="ob-fy" type="number" value="${f.years}" min="1" max="10"></div>
-    <div class="ob-field"><label class="checkbox"><input type="checkbox" id="ob-ffast" ${f.fast ? "checked" : ""}> 快速模式（跳过引用链与矛盾检测）</label></div>
+    <div class="ob-grid2">
+      <div class="ob-field"><label>篇数</label>
+        <input id="ob-fk" type="number" value="${f.top_k}" min="3" max="20"
+               oninput="OB.final.top_k=+this.value||OB.final.top_k;var e=$('#ob-est');e&&(e.textContent=obEstimate())"></div>
+      <div class="ob-field"><label>年限</label>
+        <input id="ob-fy" type="number" value="${f.years}" min="1" max="10"
+               oninput="OB.final.years=+this.value||OB.final.years"></div>
+    </div>
+    <div class="ob-field"><label class="checkbox"><input type="checkbox" id="ob-ffast" ${f.fast ? "checked" : ""}
+      onchange="OB.final.fast=this.checked;var e=$('#ob-est');e&&(e.textContent=obEstimate())"> 快速模式（跳过引用链与矛盾检测）</label></div>
+    <div class="ob-est" id="ob-est">${obEstimate()}</div>
     <div class="ob-actions">
       <button class="ob-btn ghost" onclick="OB.step=2;obRender()">← 返回选词</button>
-      <button class="ob-btn" onclick="obStartRun()">🚀 开始检索</button></div>`;
+      <button class="ob-btn grow" onclick="obStartRun()">🚀 启动检索并生成综述</button></div></div>`;
 }
 function obEnterConfirm() {
   OB.final = { ...(OB_PRESET[OB.stage] || OB_PRESET["开题调研"]) };
@@ -925,6 +1046,80 @@ function obStartRun() {
   $("#btn-run").click();
 }
 $("#btn-ob").onclick = openObWizard;
+
+/* ---------------- 初次用户引导提示 ----------------
+   仅面向"初次打开网站、不了解用途"的用户：
+   - 打开网页 4 秒内无任何输入 → 在智能引导按钮旁弹一次提示
+   - 用户点过"试试引导/先不用"后永久记住，不再打扰
+   - 每次页面加载最多尝试一次；4 秒内有任何操作则视为会用，跳过 */
+const NUDGE_KEY = "ob_nudge_done";
+function nudgeDone() {
+  try { localStorage.setItem(NUDGE_KEY, "1"); } catch (e) { /* 隐私模式等不可用时静默 */ }
+}
+function clampXY(x, y, w, h) {   // 收拢到视口内，保证任何屏幕尺寸都不被裁剪
+  const m = 10;
+  if (x + w > window.innerWidth - m) x = window.innerWidth - w - m;
+  if (y + h > window.innerHeight - m) y = window.innerHeight - h - m;
+  return [Math.max(m, x), Math.max(m, y)];
+}
+function showNudgeTip(btn) {   // 拒绝后的箭头指引："引导功能在这里"
+  nudgeDone();
+  const r = btn.getBoundingClientRect();
+  const tip = document.createElement("div");
+  tip.className = "nudge-tip";
+  tip.textContent = "← 引导功能在这里";
+  document.body.appendChild(tip);              // fixed 定位 → 挂 body，不受卡片堆叠遮挡
+  let [x, y] = clampXY(r.right + 12, r.top + r.height / 2 - tip.offsetHeight / 2,
+                        tip.offsetWidth, tip.offsetHeight);
+  if (r.right + 12 + tip.offsetWidth > window.innerWidth - 10) {   // 右侧放不下 → 改到按钮上方
+    tip.textContent = "↓ 引导功能在这里";
+    [x, y] = clampXY(r.left + r.width / 2 - tip.offsetWidth / 2, r.top - tip.offsetHeight - 8,
+                     tip.offsetWidth, tip.offsetHeight);
+  }
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+  const off = () => { tip.remove(); document.removeEventListener("pointerdown", off); };
+  setTimeout(off, 6000);                       // 6 秒后自动消失，不过度打扰
+  document.addEventListener("pointerdown", off); // 点任意处即消失
+}
+function showNudge(btn) {
+  const r = btn.getBoundingClientRect();
+  const pop = document.createElement("div");
+  pop.className = "nudge-pop";
+  pop.innerHTML = `<b>犹豫检索关键词？</b><br>试试智能引导——3 步生成你的专属文献综述方案！
+    <div class="nudge-row">
+      <button class="nudge-btn" id="nudge-yes">试试引导</button>
+      <button class="nudge-btn ghost" id="nudge-no">先不用</button>
+    </div>`;
+  document.body.appendChild(pop);              // fixed 定位 → 挂 body，不受卡片堆叠遮挡
+  let [x, y] = clampXY(r.right + 12, r.top, pop.offsetWidth, pop.offsetHeight);
+  if (r.right + 12 + pop.offsetWidth > window.innerWidth - 10) {   // 右侧放不下 → 改到按钮下方
+    [x, y] = clampXY(r.left, r.bottom + 8, pop.offsetWidth, pop.offsetHeight);
+    if (r.bottom + 8 + pop.offsetHeight > window.innerHeight - 10) // 下方也放不下 → 改到上方
+      [x, y] = clampXY(r.left, r.top - pop.offsetHeight - 8, pop.offsetWidth, pop.offsetHeight);
+  }
+  pop.style.left = x + "px"; pop.style.top = y + "px";
+  $("#nudge-yes").onclick = () => { nudgeDone(); pop.remove(); openObWizard(); };
+  $("#nudge-no").onclick = () => { pop.remove(); showNudgeTip(btn); };
+}
+(function nudgeInit() {
+  try {
+    if (localStorage.getItem(NUDGE_KEY)) return;  // 老用户/已引导过 → 永不自动弹出
+    let interacted = false;
+    const mark = () => { interacted = true; };
+    ["pointerdown", "keydown", "wheel", "touchstart"].forEach(ev =>
+      document.addEventListener(ev, mark, { passive: true }));
+    setTimeout(() => {
+      ["pointerdown", "keydown", "wheel", "touchstart"].forEach(ev =>
+        document.removeEventListener(ev, mark));
+      if (interacted) return;                     // 4 秒内有输入 → 用户会用，不打扰
+      const btn = $("#btn-ob");
+      if (!btn) return;
+      const modal = $("#modal");
+      if (modal && !modal.classList.contains("hidden")) return;  // 弹窗已开着 → 无需提示
+      showNudge(btn);
+    }, 4000);
+  } catch (e) { /* localStorage 异常时放弃该功能 */ }
+})();
 
 /* ---------------- 选中任务 ---------------- */
 function selectTask(id) {
