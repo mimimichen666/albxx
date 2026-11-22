@@ -251,7 +251,8 @@ def numeric_mismatch(claim: str, evidence: str) -> list[str]:
     return misses
 
 
-def semantic_verify(claim_content: str, evidence_text: str) -> SemanticVerifyResult:
+def semantic_verify(claim_content: str, evidence_text: str,
+                    check_numeric: bool = True) -> SemanticVerifyResult:
     """
     用LLM核验单条声明（原子事实拆分法）
 
@@ -263,12 +264,22 @@ def semantic_verify(claim_content: str, evidence_text: str) -> SemanticVerifyRes
     VERIFIER_API_KEY 时与主LLM同源（行为不变）；配置后核验与
     生成使用不同厂商模型，消除自我一致性偏差。
 
+    参数:
+        check_numeric: 是否启用第0级数值程序校验（消融实验
+            no_numeric 模式传 False，量化该层的独立贡献）
+
     返回:
         SemanticVerifyResult（atomic_facts + verdict/reason/confidence）
     """
     # ---- 第0级：数值程序校验（零LLM成本，确定性结论）----
-    misses = numeric_mismatch(claim_content, evidence_text)
-    if misses:
+    # 守卫: 仅当证据中完全没有任何百分比（无数字语境）时才程序拦截——
+    # 这是"模糊化"（提升12%→显著提升）的确定性信号。若证据里有其他
+    # 百分比，声明数值缺失更可能是"篡改"（原文95.2%声明97.2%），
+    # 方向性判定交给LLM语义核验（可判contradicted）；程序硬拦成
+    # unsupported会系统性吞掉contradicted类别，压低其召回。
+    misses = (numeric_mismatch(claim_content, evidence_text)
+              if check_numeric else [])
+    if misses and not _PCT_PAT.search(evidence_text.replace(",", "")):
         facts = ", ".join(misses)
         return SemanticVerifyResult(
             atomic_facts=[AtomicFactVerdict(
@@ -544,14 +555,16 @@ def run_d_benchmark(cases: list["BenchmarkCase"],
     不伪造判定、不污染指标（与正式流水线的llm_error协议一致）。
 
     消融实验（K2·B3优化）——ablation参数:
-      full          完整两级核验（程序化引用对齐 + LLM语义核验），默认
-      no_semantic   关闭LLM语义核验，判定退化为纯程序规则
-                    （引用对齐成功→supported，失败→unsupported）——
+      full          完整三级核验（程序对齐 + 数值校验 + LLM语义核验），默认
+      no_semantic   关闭LLM语义核验（含第0级数值校验），判定退化为纯程序
+                    规则（引用对齐成功→supported，失败→unsupported）——
                     回答"没有LLM语义核验，指标会掉多少"
                     （需样本提供quote_text+full_text，缺则跳过该样本）
-      no_alignment  关闭程序化引用对齐（引用一律放行），只留LLM语义核验
+      no_alignment  关闭程序化引用对齐（引用一律放行），只留语义核验
                     ——回答"没有逐字对齐兜底，伪造引用漏网多少"
-    三种模式各跑一遍即得消融对比表（benchmark.py ablation 子命令）。
+      no_numeric    仅关闭第0级数值程序校验，其余两级全开——
+                    回答"K1数值校验这一层独立贡献多少"
+    各模式各跑一遍即得消融对比表（benchmark.py ablation 子命令）。
 
     指标: 逐类 P/R/F1 + Macro-F1 + 误放行率
       误放行率 = (gold为坏声明 却被预测为通过) / (gold坏声明总数)
@@ -560,7 +573,7 @@ def run_d_benchmark(cases: list["BenchmarkCase"],
     """
     from models import BenchmarkCase, BenchmarkReport, BenchmarkResult
 
-    if ablation not in ("full", "no_semantic", "no_alignment"):
+    if ablation not in ("full", "no_semantic", "no_alignment", "no_numeric"):
         raise ValueError(f"未知消融模式: {ablation}")
 
     if not cases:
@@ -589,7 +602,9 @@ def run_d_benchmark(cases: list["BenchmarkCase"],
                     case.quote_text, _normalize(case.full_text))
                 verdict = "supported" if predicted_alignment else "unsupported"
             else:
-                sv = semantic_verify(case.claim_content, case.evidence_text)
+                sv = semantic_verify(
+                    case.claim_content, case.evidence_text,
+                    check_numeric=(ablation != "no_numeric"))
                 verdict = sv.verdict
                 if case.quote_text is not None and case.full_text is not None:
                     predicted_alignment = quote_alignment(
