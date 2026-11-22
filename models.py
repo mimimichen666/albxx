@@ -378,3 +378,26 @@ class HallucinationReport(BaseModel):
         if not self.total_claims:
             return 0.0
         return (self.total_claims - self.llm_errors) / self.total_claims
+
+
+# ----------------------------------------------------------------
+# 检索前引导（词云）
+# ----------------------------------------------------------------
+class GlossaryTerm(BaseModel):
+    """词云中的单个术语条目"""
+    term_en: str
+    term_zh: str
+    weight: int = Field(ge=1, le=10)      # 与主题相关度，决定词云字号与排序
+    category: Literal["core", "method", "application", "background"]
+    explanation: str
+
+    @field_validator("explanation")
+    @classmethod
+    def _trim_expl(cls, v: str) -> str:
+        return (v or "").strip()[:100]
+
+
+class TopicGlossary(BaseModel):
+    """LLM 为主体生成的主题词云：术语集合 + 主题英译"""
+    topic_en: str
+    terms: list[GlossaryTerm] = Field(min_length=8, max_length=30)

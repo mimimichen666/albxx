@@ -25,6 +25,7 @@ server.py —— FastAPI 任务服务器（方案一：前端与执行彻底解�
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -37,6 +38,7 @@ import config
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 BASE = config.PROJECT_ROOT
 DATA = config.DATA_DIR
@@ -90,8 +92,15 @@ def _load_tasks() -> list[dict]:
 def _save_tasks(tasks: list[dict]) -> None:
     os.makedirs(DATA, exist_ok=True)
     tmp = REGISTRY + ".tmp"
+    # 过滤内存态字段（_proc=Popen句柄等）。2026-11-22检索失败根因：
+    # api_run 把 Popen 塞进 task 后直接 _save_tasks → json.dump 抛
+    # "Object of type Popen is not JSON serializable" → 接口500，
+    # pid 没落盘、watcher 没启动 → sweep 把活任务误判为"已崩溃"。
+    # 约定：下划线开头的 key 一律是内存态，永不落盘。
+    clean = [{k: v for k, v in t.items() if not str(k).startswith("_")}
+             for t in tasks]
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(tasks, f, ensure_ascii=False, indent=1)
+        json.dump(clean, f, ensure_ascii=False, indent=1)
     os.replace(tmp, REGISTRY)
 
 
@@ -161,14 +170,98 @@ def _read_status() -> dict:
         return {}
 
 
+def _pid_alive(pid: int | None) -> bool:
+    """跨平台判活。Windows 用 OpenProcess+GetExitCodeProcess（os.kill(0) 在
+    Windows 语义不同，误用会直接杀进程），POSIX 用信号0探测。"""
+    if not pid:
+        return False
+    try:
+        if os.name == "nt":
+            import ctypes
+            k32 = ctypes.windll.kernel32
+            # 64位句柄必须用 c_void_p：默认 c_int 截断会导致句柄无效、
+            # GetExitCodeProcess 静默失败 → 活进程被误判死亡
+            k32.OpenProcess.restype = ctypes.c_void_p
+            k32.OpenProcess.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
+            k32.GetExitCodeProcess.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong)]
+            k32.CloseHandle.argtypes = [ctypes.c_void_p]
+            h = k32.OpenProcess(0x1000, False, int(pid))  # PROCESS_QUERY_LIMITED_INFORMATION
+            if not h:
+                return False
+            try:
+                exit_code = ctypes.c_ulong()
+                if not k32.GetExitCodeProcess(h, ctypes.byref(exit_code)):
+                    return False  # 查询失败按死亡处理（句柄失效=进程不存在）
+                return exit_code.value == 259  # STILL_ACTIVE
+            finally:
+                k32.CloseHandle(h)
+        os.kill(int(pid), 0)
+        return True
+    except Exception:
+        return False
+
+
+def _sweep_orphans() -> None:
+    """死亡检测兜底：worker 进程已不存在但任务仍标 running → 立即落终态。
+
+    watcher 线程只在"本服务器进程且其内存句柄存活"时有效——服务器重启、
+    watcher 线程意外退出（如注册表读取瞬时异常触发提前 return）都会留下
+    永远 running 的僵尸任务。此函数挂在轮询接口上，读注册表里的 pid 判活，
+    不依赖任何内存状态。"""
+    try:
+        with _lock:
+            tasks = _load_tasks()
+            changed = False
+            for t in tasks:
+                if t.get("state") != "running":
+                    continue
+                pid = t.get("pid")
+                if pid is None:  # 旧任务未持久化 pid → 退回 worker 写的 pid 文件
+                    try:
+                        pid = int(open(os.path.join(DATA, "pipeline.pid")).read().strip())
+                    except Exception:
+                        pid = None
+                if pid:
+                    if _pid_alive(pid):
+                        continue
+                else:
+                    # 无 pid 可查（注册表没存 + 全局pid文件还没写）：不能立即判死。
+                    # worker 从 spawn 到写入 pipeline.pid 有 1~3 秒窗口（解释器
+                    # 启动+import），2026-11-22 实测提交后 2 秒就被误判"崩溃"。
+                    # 90 秒宽限期内一律视为存活；超期仍无 pid 才按僵尸处理。
+                    try:
+                        age = time.time() - time.mktime(time.strptime(
+                            t.get("submitted_at", ""), "%Y-%m-%d %H:%M:%S"))
+                    except Exception:
+                        continue        # 时间都解析不了 → 保守跳过，绝不误杀
+                    if age < 90:
+                        continue
+                was_cancel = bool(t.get("cancel_requested"))
+                _snapshot(t, "cancelled" if was_cancel else "error")
+                t["msg"] = ("已按用户请求终止" if was_cancel
+                            else "worker 进程已退出且未写入终态（崩溃或服务器重启）")
+                changed = True
+            if changed:
+                _save_tasks(tasks)
+    except Exception:
+        pass  # 兜底路径自身绝不能拖垮轮询接口
+
+
 def _watcher(task: dict) -> None:
     """后台线程：跟踪活跃任务直到终态，然后落快照"""
+    misses = 0
     while True:
         time.sleep(1.0)
         tasks = _load_tasks()
         cur = _find(tasks, task["id"])
-        if cur is None:            # 注册表被清空等异常情况
-            return
+        if cur is None:
+            # 注册表瞬时读取失败/被清空 → 连续多次确认后再退出，
+            # 避免一次文件竞态就永久杀死 watcher、留下僵尸任务
+            misses += 1
+            if misses >= 10:
+                return
+            continue
+        misses = 0
         st = _read_status()
         state = st.get("state")
         proc = task.get("_proc")
@@ -221,6 +314,15 @@ async def api_run(request: Request):
     if mode not in ("standard", "mode1", "mode2", "mode3"):
         raise HTTPException(400, f"不支持的检索模式: {mode}")
 
+    _sweep_orphans()          # 先清掉历史僵尸，避免误报"已有任务在运行"
+    # 智能引导选中的术语（中英对照 [{zh, en}]）：中转页用它做论文关键词命中分析
+    raw_focus = body.get("focus_keywords") or []
+    focus = []
+    for k in raw_focus[:8]:
+        if isinstance(k, dict):
+            zh, en = str(k.get("zh") or "").strip(), str(k.get("en") or "").strip()
+            if zh or en:
+                focus.append({"zh": zh, "en": en})
     with _lock:
         tasks = _load_tasks()
         act = _active(tasks)
@@ -231,6 +333,7 @@ async def api_run(request: Request):
         task = {
             "id": tid,
             "topic": topic,
+            "focus_keywords": focus,
             "mode": mode,
             "fast": bool(body.get("fast")),
             "top_k": int(body.get("top_k", 6)),
@@ -243,6 +346,8 @@ async def api_run(request: Request):
         _save_tasks(tasks)
         proc = _spawn(task)
         task["_proc"] = proc          # 仅内存，watcher 用于兜底判活
+        task["pid"] = proc.pid        # 持久化 pid：服务器重启后 _sweep_orphans 仍能判活
+        _save_tasks(tasks)
         _ACTIVE_PROCS[tid] = proc     # 取消接口据此即时终止
     threading.Thread(target=_watcher, args=(task,), daemon=True).start()
     return {"id": tid, "state": "running"}
@@ -251,9 +356,11 @@ async def api_run(request: Request):
 @app.get("/api/tasks")
 async def api_tasks(request: Request):
     _check_auth(request)
+    _sweep_orphans()
     tasks = _load_tasks()
-    return [{"id": t["id"], "topic": t["topic"], "mode": t["mode"],
-             "fast": t.get("fast"), "state": t["state"],
+    return [{"id": t.get("id"), "topic": t.get("topic", ""),
+             "mode": t.get("mode", "standard"),
+             "fast": t.get("fast"), "state": t.get("state", "error"),
              "submitted_at": t.get("submitted_at"),
              "finished_at": t.get("finished_at"),
              "hallucination_rate": t.get("hallucination_rate"),
@@ -263,12 +370,13 @@ async def api_tasks(request: Request):
 @app.get("/api/tasks/{tid}")
 async def api_task(tid: str, request: Request):
     _check_auth(request)
+    _sweep_orphans()
     tasks = _load_tasks()
     t = _find(tasks, tid)
     if not t:
         raise HTTPException(404, "任务不存在")
     info = {k: t.get(k) for k in
-            ("id", "topic", "mode", "fast", "state", "submitted_at",
+            ("id", "topic", "focus_keywords", "mode", "fast", "state", "submitted_at",
              "finished_at", "hallucination_rate", "msg", "stage", "traceback")}
     if t["state"] == "running":
         info["live"] = _read_status()     # 活跃任务附带实时状态
@@ -308,9 +416,18 @@ async def api_cancel(tid: str, request: Request):
         except Exception:
             hard = False                      # 进程句柄异常时退回优雅取消
     _ACTIVE_PROCS.pop(tid, None)
-    msg = ("已即时终止 worker 进程" if hard
-           else "取消标志已置位，将在当前阶段结束后停止")
-    return {"ok": True, "msg": msg, "hard": hard}
+    if hard:
+        # 强杀成功 → 立即落终态，不等 watcher（worker 死在阶段中间时
+        # 状态文件不会有终态，只靠 watcher 会留下僵尸窗口）
+        with _lock:
+            tasks = _load_tasks()
+            cur = _find(tasks, tid)
+            if cur and cur.get("state") == "running":
+                _snapshot(cur, "cancelled")
+                cur["msg"] = "已按用户请求即时终止"
+                _save_tasks(tasks)
+        return {"ok": True, "msg": "已即时终止 worker 进程", "hard": True}
+    return {"ok": True, "msg": "取消标志已置位，将在当前阶段结束后停止", "hard": False}
 
 
 @app.get("/api/tasks/{tid}/stream")
@@ -404,6 +521,107 @@ async def api_result(tid: str, request: Request):
         except Exception:
             continue
     return out
+
+
+@app.get("/api/tasks/{tid}/bridge")
+def api_bridge(tid: str, request: Request):
+    """结果中转页数据：智能引导在主题尾部注入「重点关注：…」关键词，
+    此端点解析这些关键词并计算每篇论文的命中关系（标题/摘要），
+    供前端中转页展示「引导词 ↔ 论文」关联并做分流选择"""
+    _check_auth(request)
+    t = _find(_load_tasks(), tid)
+    if t is None:
+        raise HTTPException(404, "任务不存在")
+    if t.get("state") != "done":
+        raise HTTPException(404, "任务尚未完成")
+    d = _task_dir(tid)
+    if not os.path.isdir(d):
+        raise HTTPException(404, "任务无产物")
+
+    # 1) 解析引导关键词：优先用任务记录里的中英对照（智能引导传入）；
+    #    旧任务退回从主题串解析——注意主题可能堆叠多段「重点关注：…」（旧版
+    #    向导重复使用会把上次拼接结果带回输入框），全部解析并去重
+    topic = t.get("topic", "")
+    raw_focus = t.get("focus_keywords") or []
+    if raw_focus:
+        kws = [{"zh": str(k.get("zh") or "").strip(),
+                "en": str(k.get("en") or "").strip()}
+               for k in raw_focus if isinstance(k, dict)]
+    else:
+        kws, seen = [], set()
+        for part in re.findall(r"[（(]重点关注[:：](.+?)[）)]", topic):
+            for k in re.split(r"[；;]", part):
+                k = k.strip()
+                if k and k not in seen:
+                    seen.add(k)
+                    kws.append({"zh": k, "en": ""})
+
+    # 2) 读取任务产物（缺哪个文件就降级为空，不让中转页整体失败）
+    def _load(name):
+        p = os.path.join(d, name)
+        if not os.path.exists(p):
+            return None
+        try:
+            with open(p, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return None
+
+    meta = _load("meta.json") or []
+    cards = _load("paper_cards.json") or []
+    plan = _load("plan.json") or {}
+    card_map = {c.get("arxiv_id"): c for c in cards if isinstance(c, dict)}
+    # 声明文本（中文）：中文关键词即使命中不了英文标题/摘要，也可能命中声明
+    claims_text = {pid: " ".join(str(c.get("content") or "") for c in card.get("claims") or [])
+                   for pid, card in card_map.items()}
+
+    papers, cov = [], {i: 0 for i in range(len(kws))}
+    for p in meta:
+        if not isinstance(p, dict):
+            continue
+        title, abstract = p.get("title") or "", p.get("abstract") or ""
+        tl, al = title.lower(), abstract.lower()
+        cl = claims_text.get(p.get("arxiv_id"), "")
+        hits = []
+        for i, kw in enumerate(kws):
+            # 中英任一形式命中即算（中文关键词也能通过英文术语命中英文论文）
+            zh_t = kw["zh"] and kw["zh"].lower() in tl
+            zh_a = kw["zh"] and kw["zh"].lower() in al
+            en_t = kw["en"] and kw["en"].lower() in tl
+            en_a = kw["en"] and kw["en"].lower() in al
+            in_t, in_a = zh_t or en_t, zh_a or en_a
+            # 声明命中：关键词出现在该论文已提取的中文声明里（第3通道，不计分）
+            in_c = bool(kw["zh"]) and kw["zh"].lower() in cl.lower()
+            if in_t or in_a or in_c:
+                hits.append({"kw": kw["zh"] or kw["en"], "en": kw["en"],
+                             "in_title": in_t, "in_abstract": in_a,
+                             "in_claims": in_c})
+                cov[i] += 1
+        card = card_map.get(p.get("arxiv_id"), {})
+        papers.append({
+            "arxiv_id": p.get("arxiv_id"),
+            "title": title,
+            "authors": (p.get("authors") or [])[:4],
+            "year": p.get("year"),
+            "cited_by": p.get("cited_by", 0),
+            "category": card.get("method_category"),
+            "claims_n": len(card.get("claims") or []),
+            "matches": hits,
+            # 命中得分：标题命中 3 分/个，摘要命中 1 分/个
+            "score": sum(3 if h["in_title"] else 1 for h in hits),
+            "abstract": abstract[:180],
+        })
+    papers.sort(key=lambda x: (-x["score"], -(x["cited_by"] or 0)))
+    return {
+        "topic": topic,
+        "base_topic": re.sub(r"[（(]重点关注[:：].*?[）)]", "", topic).strip(),
+        "focus_keywords": [k["zh"] or k["en"] for k in kws],
+        "queries": plan.get("keywords") or [],
+        "coverage": [{"kw": k["zh"] or k["en"], "en": k["en"],
+                      "n": cov[i], "total": len(papers)}
+                     for i, k in enumerate(kws)],
+        "papers": papers,
+    }
 
 
 @app.get("/api/tasks/{tid}/log")
@@ -935,7 +1153,77 @@ async def api_health():
     return {"ok": True, "app_password": bool(getattr(config, "APP_PASSWORD", ""))}
 
 
+class GlossaryReq(BaseModel):
+    topic: str
+    identity: str = "研究生"
+    stage: str = "入门了解"
+
+
+@app.post("/api/glossary")
+def api_glossary(req: GlossaryReq, request: Request):
+    """检索前引导：为主题生成词云术语卡（含中英名/相关度/类别/一句话释义）。
+
+    复用 llm_client.chat_json 的文件缓存——同主题+身份第二次生成零成本零延迟。
+    """
+    _check_auth(request)
+    topic = (req.topic or "").strip()
+    if not topic:
+        raise HTTPException(400, "topic 不能为空")
+    try:
+        import models as _models
+        import llm_client as _llm
+    except Exception as e:
+        raise HTTPException(500, f"LLM 客户端不可用: {e}")
+    if str(BASE) not in sys.path:
+        sys.path.insert(0, str(BASE))
+    style_map = {
+        "本科生": "面向零基础本科生：优先使用生活化类比，避免未解释的行话",
+        "硕士生": "面向研究生：可用标准学术词汇，概念需点到定义",
+        "博士生": "面向领域博士：用高密度专业表述，直接给方法论脉络",
+        "研究者": "面向研究者：精确使用领域惯用语与前沿术语",
+        "工程师": "面向工程师：侧重实现与落地视角，如硬件、开销、部署",
+    }
+    style = style_map.get(req.identity, style_map["硕士生"])
+    sys_prompt = (
+        "你是学术导航助手。根据用户的研究主题与画像，生成一份主题词云术语集，帮助用户在正式检索前建立概念地图。"
+        "要求：\n"
+        "1. terms 提供 15~25 个术语，按四类覆盖：core(核心概念/它是什么)、method(方法技术/怎么做的)、"
+        "application(应用场景/用在哪里)、background(背景知识/为什么重要)，每类都要有；\n"
+        "2. weight 为该术语与主题的相关度 1~10，核心概念给 9~10，背景知识给 3~6；\n"
+        "3. term_en 用领域标准英文术语，term_zh 用规范中文译名；\n"
+        "4. explanation 为不超过80字的一句话定义，" + style + "；\n"
+        "5. 只输出术语本身，禁止输出任何文献引用、arXiv编号或作者名。"
+    )
+    user_prompt = f"研究主题：{topic}\n用户阶段：{req.stage}"
+    try:
+        glossary = _llm.chat_json(
+            [{"role": "system", "content": sys_prompt},
+             {"role": "user", "content": user_prompt}],
+            _models.TopicGlossary,
+            temperature=0.5,
+            # 词云是交互式功能（用户盯着按钮等结果），必须收紧重试上限。
+            # 默认配置下最坏耗时 ≈ 3轮解析×3次重试×120秒超时+退避 ≈ 19分钟，
+            # 前端会一直停在"生成中…"——正是词云"卡死"的根源。
+            # 收紧后最坏 = 2轮 × (1次调用 120秒) ≈ 4分钟封顶。
+            max_retries=1, parse_rounds=2,
+        )
+    except Exception as e:
+        raise HTTPException(502, f"词云生成失败: {e}")
+    return {
+        "topic_en": glossary.topic_en,
+        "terms": [t.model_dump() for t in glossary.terms],
+    }
+
+
 # 静态前端（放在最后，避免吞掉 /api/*）
+# 根路由显式接管并禁缓存：前端页面更新后，浏览器刷新即可拿到新版，
+# 不会出现"服务已更新、页面还是旧 JS"的错位（本次中转页未显示的根因）
+@app.get("/", include_in_schema=False)
+async def index_no_cache():
+    return FileResponse(os.path.join(STATIC, "index.html"),
+                        headers={"Cache-Control": "no-cache"})
+
+
 app.mount("/", StaticFiles(directory=STATIC, html=True), name="static")
 
 if __name__ == "__main__":

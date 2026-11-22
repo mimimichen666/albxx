@@ -10,3 +10,9 @@ fastapi>=0.115       # 新网页任务服务器（server.py；uvicorn/python-mul
 openai>=2.41         # LLM API调用（OpenAI兼容格式）
 pydantic>=2.13       # 结构化数据定义与校验
 python-docx>=1.1     # 综述报告导出Word（app.py与server.py共用exporter.py）
+
+# ---- HTML版服务（server.py + static/，2026-11-22补录）----
+fastapi>=0.115       # Web服务框架
+uvicorn>=0.30        # ASGI服务器
+python-multipart>=0.0.9  # 表单/文件上传解析
+

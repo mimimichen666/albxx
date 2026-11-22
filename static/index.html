@@ -326,6 +326,130 @@ iframe { width: 100%; height: 540px; border: 1px solid var(--border); border-rad
   header { flex-wrap: wrap; }
   .tab-body { max-height: none; }
 }
+
+/* ---- P0-2 判决书卡片视图 ---- */
+.view-toggle { display: flex; gap: 0; margin: 6px 0 12px; border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden; width: fit-content; }
+.vt-btn { border: none; background: var(--card); color: var(--slate); padding: 7px 16px;
+  font-size: 12.5px; cursor: pointer; font-family: inherit; }
+.vt-btn.on { background: var(--brand-lt); color: var(--brand); font-weight: 600; }
+.vc-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; }
+.vc-toolbar select { border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px;
+  font-size: 12.5px; background: var(--card); color: var(--ink); font-family: inherit; }
+.vc-stats { font-size: 12px; color: var(--muted); margin-left: auto; }
+.vcard { border: 1px solid var(--border); border-left: 5px solid var(--green);
+  border-radius: 10px; padding: 14px 16px; margin: 10px 0; background: var(--card);
+  box-shadow: var(--shadow); }
+.vhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.vbadge { font-weight: 700; font-size: 12px; border-radius: 999px; padding: 3px 12px; }
+.veid { font-family: monospace; font-size: 11.5px; color: var(--muted); }
+.vpaper { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; max-width: 420px; }
+.vclaim { font-size: 13.5px; line-height: 1.6; margin: 6px 0 10px; color: var(--ink); }
+.vlvl { background: var(--bg); border-radius: 6px; padding: 8px 10px; font-size: 12.5px;
+  margin: 4px 0; line-height: 1.55; color: var(--slate); }
+.vlvl b { color: var(--ink); }
+.vlvl code, .vfact code, .vquote code { font-size: 11px; }
+.vimg-cap { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.vimg-wrap img { width: 100%; border: 1px solid var(--border); border-radius: 6px; }
+.vfact, .vquote { font-size: 12px; color: var(--slate); margin: 3px 0; line-height: 1.5; }
+.vquote { border-left: 3px solid var(--border); padding-left: 8px; }
+.vmiss { font-size: 12px; color: var(--amber); background: var(--amber-lt);
+  border-radius: 6px; padding: 6px 10px; margin-top: 10px; }
+
+/* ---- 检索前引导（词云向导） ---- */
+#btn-ob { width: 100%; margin-top: 10px; background: var(--card); border: 1px solid var(--border);
+  color: var(--brand); border-radius: 10px; padding: 10px 12px; font-size: 13px;
+  cursor: pointer; font-family: inherit; }
+#btn-ob:hover { border-color: var(--brand); background: var(--brand-lt); }
+.ob-stepbar { display: flex; gap: 6px; margin-bottom: 14px; }
+.ob-step { flex: 1; text-align: center; font-size: 11.5px; color: var(--muted);
+  padding: 5px 2px; border-radius: 6px; background: var(--bg); }
+.ob-step.on { background: var(--brand-lt); color: var(--brand); font-weight: 600; }
+.ob-field { margin-bottom: 12px; }
+.ob-field label { display: block; font-size: 12px; color: var(--slate); margin-bottom: 5px; }
+.ob-field textarea, .ob-field select, .ob-field input { width: 100%; border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit;
+  background: var(--card); color: var(--ink); }
+.ob-field textarea { min-height: 56px; resize: vertical; }
+.ob-actions { display: flex; gap: 8px; margin-top: 14px; }
+.ob-btn { border: none; background: var(--brand-grad); color: #fff; border-radius: 10px;
+  padding: 10px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.ob-btn:disabled { opacity: .5; cursor: not-allowed; }
+.ob-btn.ghost { background: var(--card); border: 1px solid var(--border); color: var(--slate);
+  font-weight: 400; }
+.ob-spherewrap { margin-bottom: 14px; }
+.ob-sphere { position: relative; height: 300px; border-radius: 12px;
+  background: radial-gradient(circle at 50% 42%, var(--brand-lt), transparent 70%), var(--bg);
+  overflow: hidden; touch-action: none; cursor: grab; }
+.ob-sphere:active { cursor: grabbing; }
+.ob-word { position: absolute; left: 0; top: 0; white-space: nowrap; cursor: pointer;
+  will-change: transform, opacity; user-select: none; font-weight: 600; }
+.ob-word.picked { text-decoration: line-through; filter: saturate(.4); }
+.ob-word.focus { text-shadow: 0 0 14px currentColor; }
+.ob-spherehint { text-align: center; font-size: 11px; color: var(--muted); margin-top: 6px; }
+.ob-grp { margin-bottom: 12px; }
+.ob-grp b { font-size: 12px; display: block; margin-bottom: 6px; }
+.ob-pill { display: inline-block; border: 1px solid var(--border); border-radius: 999px;
+  padding: 3px 11px; margin: 0 6px 6px 0; font-size: 12.5px; cursor: pointer;
+  background: var(--card); color: var(--ink); }
+.ob-pill.on { border-color: currentColor; font-weight: 600; background: var(--brand-lt); }
+.ob-termcard { background: var(--bg); border-radius: 8px; padding: 12px 14px; font-size: 12.5px;
+  line-height: 1.6; color: var(--slate); margin-bottom: 12px; }
+.ob-termcard b { color: var(--ink); }
+.ob-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ob-chip { background: var(--brand-lt); color: var(--brand); border-radius: 999px;
+  padding: 2px 10px; font-size: 11.5px; }
+.ob-preview { background: var(--bg); border-radius: 8px; padding: 10px 12px; font-size: 12.5px;
+  color: var(--slate); margin-bottom: 12px; line-height: 1.6; }
+
+/* ---- 结果中转页（引导关键词 ↔ 论文关联 + 分流） ---- */
+.br-kwrow { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+.br-kwchip { position: relative; display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12.5px; padding: 6px 12px 8px; border-radius: 10px; overflow: hidden;
+  background: var(--brand-lt); border: 1px solid var(--border); color: var(--ink); font-weight: 600; }
+.br-kwchip i { font-style: normal; color: var(--slate); font-size: 11.5px; font-weight: 400; }
+.br-kwchip u { position: absolute; left: 0; bottom: 0; height: 3px;
+  background: var(--brand-grad); text-decoration: none; }
+.br-summary { margin: 6px 0 2px; }
+.br-row { display: flex; align-items: center; gap: 10px; padding: 9px 6px;
+  border-bottom: 1px dashed var(--border); }
+.br-no { width: 22px; height: 22px; flex: 0 0 22px; border-radius: 7px;
+  background: var(--brand-lt); color: var(--brand); font-size: 12px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; }
+.br-main { flex: 1; min-width: 0; }
+.br-title { font-size: 13px; font-weight: 600; line-height: 1.4; }
+.br-meta { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.br-hits { display: flex; flex-wrap: wrap; gap: 5px; max-width: 46%; justify-content: flex-end; }
+.br-hit { font-size: 11.5px; padding: 2px 9px; border-radius: 999px; white-space: nowrap;
+  background: var(--bg); border: 1px solid var(--border); color: var(--slate); }
+.br-hit.strong { background: var(--brand-lt); border-color: var(--brand);
+  color: var(--brand); font-weight: 600; }
+.br-hit.claim { background: #ecfdf5; border-color: #a7f3d0; color: #059669; }
+.br-note { flex-basis: 100%; font-size: 12px; color: var(--slate); background: var(--bg);
+  border: 1px dashed var(--border); border-radius: 8px; padding: 8px 12px; line-height: 1.6; }
+.br-hit.none { border-style: dashed; }
+.br-actions { display: flex; gap: 10px; margin: 14px 0 4px; flex-wrap: wrap; }
+.br-btn { flex: 1; min-width: 200px; padding: 11px 14px; border-radius: 10px;
+  border: 1px solid var(--border); background: #fff; color: var(--ink);
+  font: inherit; font-weight: 600; cursor: pointer; }
+.br-btn:hover { border-color: var(--brand); color: var(--brand); }
+.br-btn.primary { background: var(--brand-grad); border: none; color: #fff; }
+.br-btn.primary:hover { opacity: .92; color: #fff; }
+#br-papers { margin-top: 8px; }
+.br-paper { border: 1px solid var(--border); border-radius: 12px; padding: 12px;
+  margin: 10px 0; background: #fff; }
+.br-paper:hover { border-color: var(--brand); box-shadow: var(--shadow-lg); }
+.br-paper-h { display: flex; align-items: flex-start; gap: 10px; }
+.br-paper-h > div { flex: 1; min-width: 0; }
+.br-score { flex: 0 0 auto; font-size: 11.5px; color: var(--brand);
+  background: var(--brand-lt); border-radius: 999px; padding: 3px 10px; }
+.br-abs { font-size: 12.5px; color: var(--slate); margin-top: 6px; line-height: 1.6; }
+.br-abs summary { cursor: pointer; color: var(--brand); font-size: 12px; }
+.br-back { font-size: 12px; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: #fff; color: var(--slate);
+  cursor: pointer; font: inherit; }
+.br-back:hover { color: var(--brand); border-color: var(--brand); }
 </style>
 </head>
 <body>
@@ -363,6 +487,7 @@ iframe { width: 100%; height: 540px; border: 1px solid var(--border); border-rad
         <div class="form-row">
           <label class="checkbox"><input type="checkbox" id="fast"> 快速模式（跳过引用链与矛盾检测，约3分钟）</label>
         </div>
+        <button id="btn-ob" type="button">🧭 智能引导（生成词云·新手推荐）</button>
         <button id="btn-run">开始综述</button>
         <div id="btn-cancel-wrap" class="hidden" style="display:flex;margin-top:8px">
           <button id="btn-cancel">终止当前任务</button>
@@ -393,12 +518,29 @@ iframe { width: 100%; height: 540px; border: 1px solid var(--border); border-rad
         <div id="logs"></div>
       </div>
 
+      <!-- 结果中转页：引导关键词 ↔ 论文 关联 + 分流选择 -->
+      <div id="bridge-panel" class="hidden">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <b id="br-topic"></b>
+          <span class="badge done">已完成</span>
+        </div>
+        <div id="br-sub" style="font-size:12.5px;color:var(--slate);margin-top:5px;line-height:1.7"></div>
+        <div id="br-kw" class="br-kwrow"></div>
+        <div id="br-summary" class="br-summary"></div>
+        <div class="br-actions">
+          <button class="br-btn primary" onclick="brShowPapers()">📄 直接看筛选出的论文</button>
+          <button class="br-btn" onclick="brEnterFull()">🔍 查看更多信息 · 进入完整结果</button>
+        </div>
+        <div id="br-papers" class="hidden"></div>
+      </div>
+
       <!-- 结果面板 -->
       <div id="result-panel" class="hidden">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <b id="res-topic"></b>
           <span id="res-badge" class="badge"></span>
           <span id="res-hallu" class="badge hidden"></span>
+          <button id="btn-back-bridge" class="br-back hidden" onclick="brBack()">← 返回中转页</button>
         </div>
         <div id="stat-row" class="hidden"></div>
         <div id="res-err" class="hidden">
@@ -458,7 +600,25 @@ function toast(msg) {
 async function api(path, opts = {}) {
   const o = Object.assign({}, opts);
   o.headers = Object.assign({}, o.headers || {}, {"X-App-Password": pw});
-  const r = await fetch(path, o);
+  // 超时/取消支持（2026-11-22 词云卡死修复）:
+  //  - opts.timeoutMs: 到时自动 abort，避免 fetch 无限挂起（后端最坏
+  //    重试几分钟时前端永远"生成中…"，体感即页面卡死）
+  //  - opts.signal: 调用方可传入自己的 AbortController 实现"取消"
+  const to = o.timeoutMs; delete o.timeoutMs;
+  const ctl = new AbortController();
+  if (o.signal) {
+    if (o.signal.aborted) ctl.abort(o.signal.reason);
+    else o.signal.addEventListener("abort", () => ctl.abort(o.signal.reason));
+  }
+  let timedOut = false;
+  if (to) setTimeout(() => { timedOut = true; ctl.abort(); }, to);
+  o.signal = ctl.signal;
+  let r;
+  try { r = await fetch(path, o); }
+  catch (e) {
+    if (timedOut) throw new Error("请求超时，请检查网络/服务是否在线后重试");
+    throw e;   // 用户主动取消(AbortError)原样上抛，由调用方区分
+  }
   if (r.status === 401) {
     const v = prompt("请输入访问密码");
     if (v !== null) { pw = v; localStorage.setItem("pw", v); delete o.headers; return api(path, o); }
@@ -522,7 +682,9 @@ $("#btn-run").onclick = async () => {
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({
         topic, mode: $("#mode").value, fast: $("#fast").checked,
-        years: +$("#years").value, top_k: +$("#top_k").value
+        years: +$("#years").value, top_k: +$("#top_k").value,
+        // 智能引导选中的术语（中英对照）；主题不含"重点关注"说明是手动输入，不带
+        focus_keywords: (topic.includes("重点关注：") && OB.focusTerms) ? OB.focusTerms : []
       })
     });
     seenLogs = 0;
@@ -532,6 +694,238 @@ $("#btn-run").onclick = async () => {
   $("#btn-run").disabled = false;
 };
 
+/* ---------------- 检索前引导（词云向导） ---------------- */
+const OB = { step: 1, topic: "", identity: "硕士生", stage: "入门了解", focus: "",
+             glossary: null, sel: new Set(), openTerm: -1, loading: false,
+             final: null, focusTerms: null };
+const OB_STAGES = ["入门了解", "开题调研", "正式综述", "追前沿", "交叉探索"];
+const OB_PRESET = {
+  "入门了解": { mode: "mode1", fast: true,  top_k: 5,  years: 2 },
+  "开题调研": { mode: "standard", fast: false, top_k: 8,  years: 2 },
+  "正式综述": { mode: "standard", fast: false, top_k: 10, years: 3 },
+  "追前沿":   { mode: "mode2", fast: false, top_k: 5,  years: 2 },
+  "交叉探索": { mode: "mode3", fast: false, top_k: 8,  years: 5 }
+};
+const OB_CAT = {
+  core:        { label: "核心概念 · 它是什么", color: "#2563EB" },
+  method:      { label: "方法技术 · 怎么做的", color: "#047857" },
+  application: { label: "应用场景 · 用在哪里", color: "#D97706" },
+  background:  { label: "背景知识 · 为什么重要", color: "#7C3AED" }
+};
+const OB_BAR = ["① 主题画像", "② 词云选词", "③ 确认启动"];
+
+function closeModal() { obSphereStop(); $("#modal").classList.add("hidden"); }
+
+/* ---- 3D 词云球：斐波那契球面分布 + 深度投影 + 拖拽/悬停交互 ---- */
+let obRaf = 0;
+function obSphereStop() { if (obRaf) { cancelAnimationFrame(obRaf); obRaf = 0; } }
+function obSphereInit() {
+  obSphereStop();
+  const box = $("#ob-sphere");
+  if (!box) return;
+  const words = [...box.querySelectorAll(".ob-word")];
+  const N = words.length;
+  if (!N) return;
+  const R = Math.max(60, Math.min(box.clientWidth, box.clientHeight) / 2 - 30);
+  // 旋转状态跨重渲染保持（选词后球不跳回初始角度）
+  if (!OB.rot) OB.rot = { rx: 0.35, ry: 0, idle: 0 };
+  const rot = OB.rot;
+  // 斐波那契格点：均匀铺满球面，避免拥挤
+  const pts = words.map((_, i) => {
+    const y = 1 - (i + 0.5) / N, r = Math.sqrt(1 - y * y), th = i * 2.399963;
+    return { x: Math.cos(th) * r, y, z: Math.sin(th) * r };
+  });
+  let drag = null, hover = false;
+  box.onpointerdown = e => { drag = { x: e.clientX, y: e.clientY }; box.setPointerCapture(e.pointerId); };
+  box.onpointerup = () => { drag = null; rot.idle = Date.now(); };
+  box.onpointermove = e => {
+    if (!drag) return;
+    rot.ry += (e.clientX - drag.x) * 0.005;
+    rot.rx = Math.max(-1.2, Math.min(1.2, rot.rx - (e.clientY - drag.y) * 0.005));
+    drag = { x: e.clientX, y: e.clientY };
+  };
+  words.forEach(w => {
+    w.onmouseenter = () => { hover = true; };
+    w.onmouseleave = () => { hover = false; };
+    w.onclick = () => {
+      const i = +w.dataset.i;
+      OB.openTerm = OB.openTerm === i ? -1 : i;
+      obRender();
+    };
+  });
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const frame = () => {
+    if (!$("#ob-sphere")) { obRaf = 0; return; }
+    // 自动旋转：拖拽中/悬停中/刚拖完 1.2 秒内暂停
+    const spin = !reduced && !drag && !hover && Date.now() - (rot.idle || 0) > 1200;
+    if (spin) { rot.ry += 0.0042; rot.rx += Math.sin(rot.ry * 1.7) * 0.0006; }
+    const cx = box.clientWidth / 2, cy = box.clientHeight / 2;
+    const sx = Math.sin(rot.rx), cxo = Math.cos(rot.rx);
+    const sy = Math.sin(rot.ry), cyo = Math.cos(rot.ry);
+    words.forEach((w, i) => {
+      const p = pts[i];
+      const x1 = p.x * cyo + p.z * sy, z1 = -p.x * sy + p.z * cyo;   // 绕Y轴
+      const y2 = p.y * cxo - z1 * sx, z2 = p.y * sx + z1 * cxo;      // 绕X轴
+      const depth = (z2 + 2) / 3;                                    // 0.33(远)~1(近)
+      w.style.transform = `translate(-50%,-50%) translate(${(cx + x1 * R).toFixed(1)}px,${(cy + y2 * R).toFixed(1)}px) scale(${(0.55 + depth * 0.65).toFixed(3)})`;
+      w.style.opacity = (0.3 + depth * 0.7).toFixed(2);
+      w.style.zIndex = Math.round(depth * 100);
+    });
+    obRaf = requestAnimationFrame(frame);
+  };
+  frame();
+}
+
+function openObWizard() {
+  // 剥离历史「重点关注」段：避免上次拼接结果被带回向导、反复堆叠主题
+  OB.step = 1; OB.topic = $("#topic").value.trim()
+    .replace(/[（(]重点关注[:：].*?[）)]/g, "").trim();
+  OB.glossary = null;
+  OB.sel = new Set(); OB.openTerm = -1; OB.loading = false; OB.final = null; OB.focusTerms = null;
+  $("#modal-box").innerHTML = '<div id="ob-body"></div>';
+  $("#modal").classList.remove("hidden");
+  obRender();
+}
+function obBar() {
+  return `<div class="ob-stepbar">${OB_BAR.map((s, i) =>
+    `<div class="ob-step ${OB.step === i + 1 ? "on" : ""}">${s}</div>`).join("")}</div>`;
+}
+function obSelHtml(id, opts, cur, onchange) {
+  return `<select onchange="${onchange}">${opts.map(o =>
+    `<option value="${o}"${o === cur ? " selected" : ""}>${o}</option>`).join("")}</select>`;
+}
+function obRender() {
+  const el = $("#ob-body");
+  if (!el) return;
+  if (OB.step !== 2) obSphereStop();
+  if (OB.step === 1) {
+    el.innerHTML = `${obBar()}
+      <div class="ob-field"><label>研究主题</label>
+        <textarea id="ob-topic" placeholder="例如：脉冲神经网络的高效训练方法">${esc(OB.topic)}</textarea></div>
+      <div class="ob-field"><label>你的身份（影响术语解释的讲法）</label>
+        ${obSelHtml("ob-id", ["本科生", "硕士生", "博士生", "研究者", "工程师"], OB.identity, "OB.identity=this.value")}</div>
+      <div class="ob-field"><label>当前阶段（决定检索预设）</label>
+        ${obSelHtml("ob-stage", OB_STAGES, OB.stage, "OB.stage=this.value")}</div>
+      <div class="ob-field"><label>关注侧重（可选）</label>
+        <input id="ob-focus" value="${esc(OB.focus)}" placeholder="例如：关注硬件实现"
+               oninput="OB.focus=this.value"></div>
+      <div class="ob-actions">
+        <button class="ob-btn" id="ob-gen" onclick="obGenerate()"
+                ${OB.loading ? "disabled" : ""}>${OB.loading ? "🪄 生成中…" : "🪄 生成引导词云"}</button>
+        ${OB.loading ? `<button class="ob-btn ghost" onclick="obCancelGen()">✖ 取消</button>` : ""}
+        <button class="ob-btn ghost" onclick="closeModal()">跳过引导</button></div>
+      ${OB.error ? `<div class="ob-preview">⚠️ ${esc(OB.error)}——可直接跳过引导，用左侧表单检索</div>` : ""}`;
+    if (!OB.loading) $("#ob-topic").value = OB.topic;
+    return;
+  }
+  if (OB.step === 2) {
+    const terms = OB.glossary.terms;
+    // 防御兜底: LLM/历史缓存可能给出预置四类之外的category或异常weight，
+    // 直接取下标会抛TypeError导致obRender中断、弹窗永远停在"生成中…"
+    const catOf = t => OB_CAT[t.category] || OB_CAT.core;
+    const wOf = t => Math.max(1, Math.min(10, Number(t.weight) || 5));
+    const cloud = terms.map((t, i) =>
+      `<span class="ob-word ${OB.sel.has(i) ? "picked" : ""} ${OB.openTerm === i ? "focus" : ""}"
+        data-i="${i}" style="color:${catOf(t).color};font-size:${Math.round(12 + wOf(t))}px"
+        title="${esc(t.term_en)} · 相关度${t.weight}">${esc(t.term_zh)}</span>`).join("");
+    const groups = Object.keys(OB_CAT).map(c => {
+      const list = terms.map((t, i) => ({ t, i })).filter(x => x.t.category === c)
+        .sort((a, b) => b.t.weight - a.t.weight);
+      if (!list.length) return "";
+      return `<div class="ob-grp"><b style="color:${OB_CAT[c].color}">${OB_CAT[c].label}</b>
+        ${list.map(x => `<span class="ob-pill ${OB.sel.has(x.i) ? "on" : ""}"
+          style="color:${OB.sel.has(x.i) ? OB_CAT[c].color : "inherit"}"
+          onclick="OB.sel.has(${x.i})?OB.sel.delete(${x.i}):OB.sel.add(${x.i});OB.openTerm=${x.i};obRender()">
+          ${esc(x.t.term_zh)} ${esc(x.t.term_en)}</span>`).join("")}</div>`;
+    }).join("");
+    const t = OB.openTerm >= 0 ? terms[OB.openTerm] : null;
+    const card = t ? `<div class="ob-termcard">
+        <b>${esc(t.term_zh)} · ${esc(t.term_en)}</b>
+        <span style="color:${catOf(t).color}">［${(catOf(t).label || "术语").split(" · ")[0]} · 相关度 ${t.weight}/10］</span><br>
+        ${esc(t.explanation)}<br>
+        <button class="ob-btn" style="padding:5px 12px;font-size:12px;margin-top:6px"
+          onclick="OB.sel.has(${OB.openTerm})?OB.sel.delete(${OB.openTerm}):OB.sel.add(${OB.openTerm});obRender()">
+          ${OB.sel.has(OB.openTerm) ? "✓ 已加入检索词（点击移除）" : "＋ 加入检索词"}</button></div>`
+      : `<div class="ob-termcard">👆 点击任意词查看解释，选中后将与主题一起进入检索规划</div>`;
+    const chips = [...OB.sel].map(i => `<span class="ob-chip">${esc(terms[i].term_zh)}</span>`).join("");
+    el.innerHTML = `${obBar()}
+      <div class="ob-spherewrap">
+        <div class="ob-sphere" id="ob-sphere">${cloud}</div>
+        <div class="ob-spherehint">🖱 拖拽旋转 · 悬停暂停 · 点击词看解释 · 划线=已选</div>
+      </div>${card}${groups}
+      <div class="ob-chips">${OB.sel.size ? `已选 ${OB.sel.size} 个：${chips}` : "未选词也可继续（仅用主题检索）"}</div>
+      <div class="ob-actions">
+        <button class="ob-btn ghost" onclick="OB.step=1;OB.error='';obRender()">← 上一步</button>
+        <button class="ob-btn" onclick="OB.step=3;obEnterConfirm()">下一步：确认启动 →</button></div>`;
+    obSphereInit();
+    return;
+  }
+  // step 3
+  const f = OB.final, names = [...OB.sel].map(i => OB.glossary.terms[i].term_zh);
+  const finalTopic = OB.topic + (names.length ? `（重点关注：${names.join("；")}）` : "");
+  el.innerHTML = `${obBar()}
+    <div class="ob-preview"><b>最终检索主题</b><br>${esc(finalTopic)}
+      ${OB.focus ? `<br>关注侧重：${esc(OB.focus)}` : ""}</div>
+    <div class="ob-field"><label>检索模式（已按「${esc(OB.stage)}」预设，可修改）</label>
+      <select id="ob-fmode">
+        ${[["standard", "📌 标准（推荐）"], ["mode1", "🌱 入门综述模式"], ["mode2", "🚀 前沿突破模式"], ["mode3", "🔀 交叉领域模式"]]
+          .map(([v, l]) => `<option value="${v}"${f.mode === v ? " selected" : ""}>${l}</option>`).join("")}
+      </select></div>
+    <div class="ob-field"><label>篇数</label>
+      <input id="ob-fk" type="number" value="${f.top_k}" min="3" max="20"></div>
+    <div class="ob-field"><label>年限</label>
+      <input id="ob-fy" type="number" value="${f.years}" min="1" max="10"></div>
+    <div class="ob-field"><label class="checkbox"><input type="checkbox" id="ob-ffast" ${f.fast ? "checked" : ""}> 快速模式（跳过引用链与矛盾检测）</label></div>
+    <div class="ob-actions">
+      <button class="ob-btn ghost" onclick="OB.step=2;obRender()">← 返回选词</button>
+      <button class="ob-btn" onclick="obStartRun()">🚀 开始检索</button></div>`;
+}
+function obEnterConfirm() {
+  OB.final = { ...(OB_PRESET[OB.stage] || OB_PRESET["开题调研"]) };
+  obRender();
+}
+async function obGenerate() {
+  OB.topic = $("#ob-topic").value.trim()
+    .replace(/[（(]重点关注[:：].*?[）)]/g, "").trim();
+  if (!OB.topic) { OB.error = "请先输入研究主题"; obRender(); return; }
+  OB.loading = true; OB.error = ""; OB.t0 = Date.now();
+  OB.ctl = new AbortController();
+  // 计时器：让用户看到"真的在动"，不再像卡死（2026-11-22修复）
+  OB.tick = setInterval(() => {
+    const b = $("#ob-gen");
+    if (b && OB.loading)
+      b.textContent = `🪄 生成中… ${Math.round((Date.now() - OB.t0) / 1000)} 秒`;
+  }, 1000);
+  obRender();
+  try {
+    OB.glossary = await api("/api/glossary", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic: OB.topic, identity: OB.identity, stage: OB.stage }),
+      timeoutMs: 90000, signal: OB.ctl.signal
+    });
+    OB.step = 2; OB.openTerm = -1;
+  } catch (e) {
+    OB.error = e.name === "AbortError" ? "已取消生成"
+             : (e.message || "词云生成失败");
+  }
+  clearInterval(OB.tick); OB.loading = false; obRender();
+}
+function obCancelGen() { if (OB.ctl) OB.ctl.abort(); }
+function obStartRun() {
+  const names = [...OB.sel].map(i => OB.glossary.terms[i].term_zh);
+  // 保存中英对照术语（中转页据此做论文关键词命中分析）
+  OB.focusTerms = [...OB.sel].map(i =>
+    ({zh: OB.glossary.terms[i].term_zh, en: OB.glossary.terms[i].term_en}));
+  $("#topic").value = OB.topic + (names.length ? `（重点关注：${names.join("；")}）` : "");
+  $("#mode").value = $("#ob-fmode").value;
+  $("#top_k").value = $("#ob-fk").value;
+  $("#years").value = $("#ob-fy").value;
+  $("#fast").checked = $("#ob-ffast").checked;
+  closeModal();
+  $("#btn-run").click();
+}
+$("#btn-ob").onclick = openObWizard;
+
 /* ---------------- 选中任务 ---------------- */
 function selectTask(id) {
   curTask = id;
@@ -539,14 +933,105 @@ function selectTask(id) {
   stopLive();
   api("/api/tasks/" + id).then(t => {
     if (t.state === "running") startLive(id, t);
-    else showResult(id, t);
+    else tryBridge(id, t);
     refreshTasks(id);
   }).catch(e => toast(e.message));
+}
+
+/* ---------------- 结果中转页（引导关键词 ↔ 论文关联 + 分流） ---------------- */
+let BRIDGE = null;   // {tid, t, b} 当前中转页上下文
+async function tryBridge(id, t) {
+  BRIDGE = null;
+  // 只有成功任务且主题带「重点关注：…」引导关键词才进中转页，否则走完整结果
+  if (t.state === "done") {
+    try {
+      const b = await api(`/api/tasks/${id}/bridge`);
+      if (b && b.focus_keywords && b.focus_keywords.length && b.papers.length) {
+        BRIDGE = {tid: id, t, b};
+        showBridge();
+        return;
+      }
+    } catch (e) { /* 无引导关键词或产物缺失 → 直接进完整结果 */ }
+  }
+  showResult(id, t);
+}
+function showBridge() {
+  const b = BRIDGE.b, n = b.papers.length;
+  $("#placeholder").classList.add("hidden");
+  $("#progress-panel").classList.add("hidden");
+  $("#result-panel").classList.add("hidden");
+  $("#bridge-panel").classList.remove("hidden");
+  $("#br-papers").classList.add("hidden");   // 每次进入重置分流
+  $("#br-topic").textContent = b.base_topic || b.topic;
+  $("#br-sub").innerHTML =
+    `🧭 本次检索由智能引导词云驱动：你在引导中选中的关键词已注入检索主题与检索计划。` +
+    `系统筛选出 <b>${n}</b> 篇论文，下面是每篇论文与你所选关键词的命中关系。` +
+    (b.queries.length ? `<br>🔎 检索计划基于 ${b.queries.length} 组检索词：` +
+      b.queries.map(q => `<code>${esc(q)}</code>`).join("、") : "");
+  // 关键词覆盖度（覆盖条 = 命中该词的论文占比）
+  $("#br-kw").innerHTML = b.coverage.map(c => {
+    const pct = c.total ? Math.round(c.n / c.total * 100) : 0;
+    return `<span class="br-kwchip" title="有 ${c.n} 篇论文命中该关键词${c.en ? "（" + esc(c.en) + "）" : ""}">🗝 ${esc(c.kw)}
+      <i>${c.n}/${c.total} 篇 · ${pct}%</i><u style="width:${pct}%"></u></span>`;
+  }).join("") +
+    (b.coverage.length && b.coverage.every(c => !c.en && c.n === 0)
+      ? `<div class="br-note">ⓘ 该任务创建于「中英对照关键词」功能上线之前，只能按中文关键词匹配英文论文原文，命中率受限。重新用 🧭 智能引导创建一次任务，即可看到完整的关键词命中分析。</div>`
+      : "");
+  // 论文 ↔ 关键词 一览（标题命中=实心高亮，摘要命中=浅色）
+  $("#br-summary").innerHTML = b.papers.map((p, i) => {
+    const hits = p.matches.length
+      ? p.matches.map(h => {
+          const where = h.in_title ? "标题" : (h.in_abstract ? "摘要" : "声明");
+          const cls = h.in_title ? "strong" : (h.in_abstract ? "" : "claim");
+          const tip = esc(h.en || h.kw) + " · " +
+            [h.in_title && "标题", h.in_abstract && "摘要", h.in_claims && "声明"]
+              .filter(Boolean).join("+");
+          return `<span class="br-hit ${cls}" title="${tip}">${esc(h.kw)}（${where}）</span>`;
+        }).join("")
+      : `<span class="br-hit none" title="未直接命中关键词，按主题相关度收录">按主题相关度收录</span>`;
+    return `<div class="br-row">
+      <span class="br-no">${i + 1}</span>
+      <div class="br-main"><div class="br-title">${esc(p.title)}</div>
+        <div class="br-meta">${p.year || "?"} 年 · 被引 ${p.cited_by || 0}${p.category ? " · " + esc(p.category) : ""}</div></div>
+      <div class="br-hits">${hits}</div></div>`;
+  }).join("");
+}
+function brShowPapers() {
+  const el = $("#br-papers");
+  if (!el.classList.contains("hidden")) { el.classList.add("hidden"); return; }
+  el.innerHTML = BRIDGE.b.papers.map((p, i) => {
+    const hits = p.matches.map(h => {
+      const where = h.in_title ? "标题" : (h.in_abstract ? "摘要" : "声明");
+      const cls = h.in_title ? "strong" : (h.in_abstract ? "" : "claim");
+      return `<span class="br-hit ${cls}" title="${esc(h.en || h.kw)}">${esc(h.kw)} · ${where}</span>`;
+    }).join("");
+    return `<div class="br-paper">
+      <div class="br-paper-h"><span class="paper-num">${i + 1}</span>
+        <div><div class="br-title">${esc(p.title)}</div>
+        <div class="br-meta">${esc((p.authors || []).join(", "))}${p.authors && p.authors.length ? " · " : ""}${p.year || "?"} 年 · 被引 ${p.cited_by || 0}
+          ${p.category ? `· <span class="badge">${esc(p.category)}</span>` : ""}
+          ${p.claims_n ? `· 已提取 ${p.claims_n} 条声明` : ""}</div></div>
+        ${p.score ? `<span class="br-score" title="关键词命中得分：标题 3 分/个，摘要 1 分/个">命中 ${p.score} 分</span>` : ""}</div>
+      ${hits ? `<div class="br-hits" style="max-width:100%;justify-content:flex-start;margin:7px 0 0">${hits}</div>` : ""}
+      ${p.abstract ? `<details class="br-abs"><summary>▸ 摘要（前 180 字）</summary>${esc(p.abstract)}…</details>` : ""}
+    </div>`;
+  }).join("");
+  el.classList.remove("hidden");
+  el.scrollIntoView({behavior: "smooth", block: "nearest"});
+}
+function brEnterFull() {
+  $("#bridge-panel").classList.add("hidden");
+  showResult(BRIDGE.tid, BRIDGE.t);
+}
+function brBack() {
+  $("#result-panel").classList.add("hidden");
+  showBridge();
 }
 
 function stopLive() {
   $("#progress-panel").classList.add("hidden");
   $("#result-panel").classList.add("hidden");
+  $("#bridge-panel").classList.add("hidden");
   $("#btn-cancel-wrap").classList.add("hidden");
   $("#logs").innerHTML = "";
   $("#stage-bar").innerHTML = "";
@@ -633,8 +1118,10 @@ function downloadText(name, text) {
 async function showResult(id, t) {
   $("#placeholder").classList.add("hidden");
   $("#progress-panel").classList.add("hidden");
+  $("#bridge-panel").classList.add("hidden");
   const p = $("#result-panel");
   p.classList.remove("hidden");
+  $("#btn-back-bridge").classList.toggle("hidden", !BRIDGE);
   $("#res-topic").textContent = t.topic;
   $("#res-badge").className = "badge " + t.state;
   $("#res-badge").textContent = stateText(t.state);
@@ -814,11 +1301,160 @@ async function showEvidence(arxivId, idx) {
   mb.innerHTML = h;
 }
 
-/* ---- 标签: 核验明细（两级核验 + Benchmark + 详情展开） ---- */
+/* ---- 标签: 核验明细（表格/判决书卡片双视图 + Benchmark + 详情展开） ---- */
+let reviewView = "table";                       // "table" | "cards"
+let reviewFilter = { bucket: "all", paper: "all" };
+
+/* 判定桶口径与 Streamlit 版 _verdict_bucket 一致:
+   llm_error且非幻觉→核验失败 / hallucination→剔除 / abstained→暂缓 / 其余→通过 */
+function vcBucket(v) {
+  const sem = (v.verdict && v.verdict.verdict) || "abstained";
+  if ((v.review_status || "ok") === "llm_error" && !v.hallucination) return "error";
+  if (v.hallucination) return "hallucination";
+  if (sem === "abstained") return "abstained";
+  return "supported";
+}
+const VC_META = {
+  supported:     { label: "✅ 核实通过",   color: "var(--green)", bg: "var(--green-lt)" },
+  hallucination: { label: "❌ 幻觉剔除",   color: "var(--red)",   bg: "var(--red-lt)" },
+  abstained:     { label: "⏸️ 证据不足暂缓", color: "var(--amber)", bg: "var(--amber-lt)" },
+  error:         { label: "⚠️ 核验失败",   color: "var(--muted)", bg: "var(--bg)" }
+};
+
+function vcCardHtml(v, paperTitle, quotes) {
+  const b = vcBucket(v), m = VC_META[b];
+  const sem = (v.verdict && v.verdict.verdict) || "abstained";
+  // 第1级: 程序化引用对齐详情
+  const qd = (v.quote_details || []).slice(0, 3).map(d => d.aligned
+    ? `✓ 第${(d.page ?? 0) + 1}页 · 置信度${(d.confidence ?? 0).toFixed(2)}`
+    : `✗ ${esc(d.section || "")}未定位`).join("；");
+  // 第2级: 原子事实拆分
+  const FI = { supported: "✅", unsupported: "❌", contradicted: "⚔️", abstained: "⏸️" };
+  const facts = (v.atomic_facts || []).slice(0, 6).map(f =>
+    `<div class="vfact">${FI[f.verdict] || "•"} <code>${esc(f.verdict)}</code> ${esc((f.fact || "").slice(0, 90))}</div>`).join("");
+  const factsHtml = facts ? `<div class="vlvl"><b>原子事实核验</b>${facts}</div>` : "";
+  // 证据截图: 内嵌卡片（不再藏在弹层）
+  const ev = (CUR.r.evidence || {})[`${v.arxiv_id}#${v.claim_index}`];
+  let evHtml;
+  if (ev && ev.located && ev.image) {
+    evHtml = `<div class="vimg-wrap">
+      <img src="/api/evidence-img/${encodeURIComponent(ev.image)}${pwq()}"
+           alt="PDF高亮页" loading="lazy"
+           onerror="this.parentNode.innerHTML='<div class=\\'vmiss\\'>⚠️ 证据图片加载失败（服务器重启后 evidence/ 会清空）</div>'">
+      <div class="vimg-cap">📎 ${esc(ev.pdf || v.arxiv_id)} 第${(ev.page ?? 0) + 1}页 · 黄色高亮=证据原文 · 匹配级别 ${esc(ev.match_level || "?")}</div></div>`;
+  } else if (ev && ev.located) {
+    evHtml = `<div class="vmiss">⚠️ 证据图片缺失（服务器重启后 evidence/ 目录会清空）</div>`;
+  } else if (ev) {
+    evHtml = `<div class="vmiss">引用未能在PDF中定位（无截图）</div>`;
+  } else {
+    evHtml = `<div class="vmiss">该声明无证据索引（证据截图仅为核验通过的声明生成）</div>`;
+  }
+  // 引用原文
+  const qs = (quotes || []).slice(0, 3).map(q =>
+    `<div class="vquote"><code>${esc(q.section || "")}</code> ${esc((q.text || "").slice(0, 160))}</div>`).join("");
+  const quotesHtml = qs ? `<div class="vlvl"><b>引用原文</b>${qs}</div>` : "";
+  return `<div class="vcard" style="border-left-color:${m.color}">
+    <div class="vhead">
+      <span class="vbadge" style="background:${m.bg};color:${m.color}">${m.label}</span>
+      <span class="veid">${esc(v.arxiv_id)}#${v.claim_index}</span>
+      <span class="vpaper">${esc(paperTitle || "")}</span></div>
+    <div class="vclaim">${esc(v.claim_content || "")}</div>
+    <div class="vlvl"><b>第1级 · 程序化引用对齐</b>：${v.quote_alignment ? "✓ 真实" : "✗ 疑似伪造"}
+      ${v.aligned_quote_count != null ? ` · ${v.aligned_quote_count}/${v.quote_count ?? ""}条命中` : ""}
+      ${qd ? `<br><span style="font-size:11px">${qd}</span>` : ""}</div>
+    <div class="vlvl"><b>第2级 · LLM语义核验</b>：<code>${esc(sem)}</code> · 置信度 ${((v.verdict && v.verdict.confidence) ?? 0).toFixed(2)}
+      ${v.verdict && v.verdict.reason ? `<br>${esc(v.verdict.reason)}` : ""}</div>
+    ${factsHtml}
+    ${evHtml}
+    ${quotesHtml}</div>`;
+}
+
+async function exportVerdictCards() {
+  const node = $("#vcards");
+  if (!node) return;
+  const clone = node.cloneNode(true);
+  // 图片转base64 → 导出文件离线自包含
+  for (const im of clone.querySelectorAll("img")) {
+    try {
+      const resp = await fetch(im.src);
+      if (!resp.ok) throw 0;
+      const blob = await resp.blob();
+      im.src = await new Promise(res => {
+        const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob);
+      });
+    } catch (e) { im.parentNode && (im.parentNode.innerHTML = '<div class="vmiss">⚠️ 证据图片未随导出保留</div>'); }
+  }
+  const topic = (CUR.t && CUR.t.topic) || "";
+  const doc = `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
+<title>证据判决书 · ${esc(topic)}</title><style>
+body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;max-width:900px;margin:0 auto;padding:24px;background:#f4f6fb;}
+h1{font-size:1.3rem;color:#101828;} .meta{color:#98a2b3;font-size:.85rem;margin-bottom:8px;}
+.vcard{border:1px solid #e4e9f2;border-left:5px solid #047857;border-radius:10px;padding:14px 16px;margin:10px 0;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.05);}
+.vhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.vbadge{font-weight:700;font-size:12px;border-radius:999px;padding:3px 12px;}
+.veid{font-family:monospace;font-size:11.5px;color:#98a2b3;}
+.vpaper{font-size:11.5px;color:#98a2b3;}
+.vclaim{font-size:13.5px;line-height:1.6;margin:6px 0 10px;color:#101828;}
+.vlvl{background:#f4f6fb;border-radius:6px;padding:8px 10px;font-size:12.5px;margin:4px 0;line-height:1.55;color:#475569;}
+.vlvl b{color:#101828;} .vlvl code,.vfact code,.vquote code{font-size:11px;}
+.vimg-cap{font-size:11px;color:#98a2b3;margin-top:4px;}
+.vimg-wrap img{width:100%;border:1px solid #e4e9f2;border-radius:6px;}
+.vfact,.vquote{font-size:12px;color:#475569;margin:3px 0;line-height:1.5;}
+.vquote{border-left:3px solid #e4e9f2;padding-left:8px;}
+.vmiss{font-size:12px;color:#b45309;background:#fef3c7;border-radius:6px;padding:6px 10px;margin-top:10px;}
+</style></head><body><h1>📋 证据判决书 · ${esc(topic)}</h1>
+<div class="meta">文献综述 Agent 两级防幻觉核验产出 · 生成于 ${new Date().toLocaleString("zh-CN")}</div>
+${clone.innerHTML}</body></html>`;
+  const url = URL.createObjectURL(new Blob([doc], { type: "text/html" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = "evidence_cards.html"; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function renderVerdictCards(revRows) {
+  const r = CUR.r;
+  // 论文标题 / 声明引用原文索引
+  const titleOf = {}, quotesOf = {};
+  (Array.isArray(r.cards) ? r.cards : []).forEach(c => {
+    titleOf[c.arxiv_id] = c.title;
+    (c.claims || []).forEach((cl, i) => { quotesOf[`${c.arxiv_id}#${i}`] = cl.quotes; });
+  });
+  const shown = revRows.filter(v =>
+    (reviewFilter.bucket === "all" || vcBucket(v) === reviewFilter.bucket) &&
+    (reviewFilter.paper === "all" || v.arxiv_id === reviewFilter.paper));
+  const stat = {};
+  revRows.forEach(v => { const b = vcBucket(v); stat[b] = (stat[b] || 0) + 1; });
+  const opt = (val, label, cur) => `<option value="${val}"${val === cur ? " selected" : ""}>${label}</option>`;
+  const papers = [...new Set(revRows.map(v => v.arxiv_id))];
+  let html = `<div class="vc-toolbar">
+    <select onchange="reviewFilter.bucket=this.value;renderReview()">
+      ${opt("all", "判定: 全部", reviewFilter.bucket)}
+      ${Object.keys(VC_META).map(k => opt(k, VC_META[k].label.slice(2), reviewFilter.bucket)).join("")}
+    </select>
+    <select onchange="reviewFilter.paper=this.value;renderReview()">
+      ${opt("all", "论文: 全部", reviewFilter.paper)}
+      ${papers.map(p => opt(p, p, reviewFilter.paper)).join("")}
+    </select>
+    <span class="vc-stats">共 ${revRows.length} 条 · 显示 ${shown.length} 条
+      （✅${stat.supported || 0} ❌${stat.hallucination || 0} ⏸️${stat.abstained || 0} ⚠️${stat.error || 0}）</span>
+    <button class="act-btn ghost" onclick="exportVerdictCards()">📤 导出判决书HTML</button></div>`;
+  html += shown.length
+    ? `<div id="vcards">${shown.map(v =>
+        vcCardHtml(v, titleOf[v.arxiv_id], quotesOf[`${v.arxiv_id}#${v.claim_index}`])).join("")}</div>`
+    : '<div class="empty">当前筛选条件下没有声明</div>';
+  return html;
+}
+
 function renderReview() {
   const r = CUR.r;
   const revRows = Array.isArray(r.review) ? r.review : [];
-  let html = "";
+  let html = `<div class="view-toggle">
+    <button class="vt-btn ${reviewView === "table" ? "on" : ""}" onclick="reviewView='table';renderReview()">📋 表格视图</button>
+    <button class="vt-btn ${reviewView === "cards" ? "on" : ""}" onclick="reviewView='cards';renderReview()">🗂 判决书卡片视图</button></div>`;
+  if (reviewView === "cards") {
+    $("#tab-review").innerHTML = html + renderVerdictCards(revRows);
+    return;
+  }
   if (r.benchmark && r.benchmark.verdict_accuracy != null) {
     const b = r.benchmark;
     const pf = b.precision || {}, rc = b.recall || {}, f1 = b.f1 || {};

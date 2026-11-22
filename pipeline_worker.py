@@ -102,6 +102,10 @@ def run_pipeline(topic: str, top_k: int, mode: str, years: int,
         if getattr(p, "local_path", None):
             extract_futures.append(
                 (p, extract_pool.submit(extractor.extract_card, p)))
+            # 逐篇进度上报: 15篇深度模式下载可达十几分钟, 不上报则
+            # UI长时间停在"下载论文PDF中"看起来像卡死(2026-11-19)
+            log(f"检索Agent: PDF已就绪 {len(extract_futures)} 篇, "
+                f"提取流水线已同步推进...", stage="检索")
 
     try:
         # ---- 运行元数据落盘(UI据此区分快速/深度模式显示) ----
