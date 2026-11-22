@@ -27,6 +27,7 @@ import json
 import re
 import time
 import bisect
+from collections import Counter
 from difflib import SequenceMatcher
 
 import llm_client
@@ -263,6 +264,8 @@ def semantic_verify(claim_content: str, evidence_text: str,
     核验走 config.VERIFIER_APIS 端点（K1异构核验）：未配置
     VERIFIER_API_KEY 时与主LLM同源（行为不变）；配置后核验与
     生成使用不同厂商模型，消除自我一致性偏差。
+    可选多模型投票（ENSEMBLE_VERIFY=1 + VERIFIER2_*）：多端点
+    各判一次，多数一致采纳，分歧取最严并标注"待人工复核"。
 
     参数:
         check_numeric: 是否启用第0级数值程序校验（消融实验
@@ -300,13 +303,37 @@ def semantic_verify(claim_content: str, evidence_text: str,
             f"【声明】{claim_content}\n\n"
             f"【原文片段】{evidence_text}"},
     ]
-    result = llm_client.chat_json(
-        messages, schema_class=SemanticVerifyResult,
-        temperature=config.TEMP_REVIEWER,  # 审查要求稳定，最低温度
-        apis=config.VERIFIER_APIS,  # K1: 核验走异构端点（未配置则同源回落）
-    )
-    # 程序化汇总：以原子事实的最坏非暂缓判定为准，覆盖模型的verdict字段
-    result.verdict = _aggregate_verdicts(result.atomic_facts)
+    # K1: 核验端点——默认单端点（未配置VERIFIER_API_KEY则同源回落）；
+    # ENSEMBLE_VERIFY=1 且配置VERIFIER2_*后启用多模型投票
+    endpoints = (config.VERIFIER_ENSEMBLE
+                 if (config.ENSEMBLE_VERIFY and config.VERIFIER_ENSEMBLE)
+                 else [config.VERIFIER_APIS])
+    results: list[SemanticVerifyResult] = []
+    for eps in endpoints:
+        r = llm_client.chat_json(
+            messages, schema_class=SemanticVerifyResult,
+            temperature=config.TEMP_REVIEWER,  # 审查要求稳定，最低温度
+            apis=eps,  # K1: 核验走异构端点（未配置则同源回落）
+        )
+        # 程序化汇总：以原子事实的最坏非暂缓判定为准，覆盖模型的verdict字段
+        r.verdict = _aggregate_verdicts(r.atomic_facts)
+        results.append(r)
+
+    result = results[0]
+    if len(results) > 1:
+        # 多模型投票（K1可选扩展）: 严格多数一致→采纳；否则取最严
+        # 判定并在reason标注待人工复核（分歧本身是重要的风险信号）
+        verdicts = [r.verdict for r in results]
+        top, cnt = Counter(verdicts).most_common(1)[0]
+        if cnt > len(verdicts) // 2:
+            result.verdict = top
+        else:
+            result.verdict = max(verdicts, key=lambda v: _AGG_ORDER[v])
+            result.reason = (f"【多模型核验分歧，待人工复核: "
+                             f"{'/'.join(verdicts)}】"
+                             f"{result.reason or ''}".strip())
+        result.confidence = round(
+            sum(r.confidence for r in results) / len(results), 3)
     return result
 
 
