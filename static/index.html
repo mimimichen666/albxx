@@ -672,6 +672,7 @@ iframe { width: 100%; height: 540px; border: 1px solid var(--border); border-rad
           <button data-tab="qa">💬 可信问答</button>
           <button data-tab="assist">🤖 AI助手</button>
           <button data-tab="survey">📚 综述总结</button>
+          <button data-tab="blind">🎯 盲区与覆盖</button>
           <button data-tab="conflicts">⚡ 矛盾与张力</button>
           <button data-tab="table">📊 综述表格</button>
           <button data-tab="graph">🕸 引用图谱</button>
@@ -685,6 +686,7 @@ iframe { width: 100%; height: 540px; border: 1px solid var(--border); border-rad
         <div class="tab-body hidden" id="tab-qa"></div>
         <div class="tab-body hidden" id="tab-assist"></div>
         <div class="tab-body hidden" id="tab-survey"></div>
+        <div class="tab-body hidden" id="tab-blind"></div>
         <div class="tab-body hidden" id="tab-conflicts"></div>
         <div class="tab-body hidden" id="tab-table"></div>
         <div class="tab-body hidden" id="tab-graph"></div>
@@ -701,7 +703,7 @@ iframe { width: 100%; height: 540px; border: 1px solid var(--border); border-rad
 </div>
 
 <script>
-const STAGES = ["规划", "检索", "提取", "审查", "综合", "矛盾检测", "证据定位"];
+const STAGES = ["规划", "检索", "提取", "审查", "综合", "矛盾检测", "证据定位", "盲区分析"];
 const $ = s => document.querySelector(s);
 let pw = localStorage.getItem("pw") || "";
 let curTask = null, es = null, seenLogs = 0;
@@ -1464,7 +1466,7 @@ async function showResult(id, t) {
   surveyText = ""; searchSort = 0; EVLOOKUP = {};
 
   renderSearch(); renderCards(); renderReview();
-  renderSurvey(); renderConflicts(); renderTable(); renderGraph(); renderGuide();
+  renderSurvey(); renderBlind(); renderConflicts(); renderTable(); renderGraph(); renderGuide();
 
   // 统计条
   const revRows = Array.isArray(r.review) ? r.review : [];
@@ -2085,6 +2087,37 @@ async function genSurvey() {
   btn.disabled = false;
 }
 
+/* ---- 标签: 盲区与覆盖（P0-1 盲区报告 + K4 全覆盖反向校验） ---- */
+function renderBlind() {
+  const r = CUR.r;
+  const cov = r.coverage || null;
+  const md = r.blindspots || "";
+  const stat = (v, k, cls) =>
+    `<div class="stat"><div class="v ${cls || ""}">${v}</div><div class="k">${k}</div></div>`;
+  let head = "";
+  if (cov) {
+    const k4 = cov.k4 || {};
+    const unc = k4.uncovered || [];
+    const sup = (cov.verdict_distribution || {}).supported || 0;
+    head = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:2px 0 12px">` +
+      stat(Math.round((k4.coverage_rate || 0) * 100) + "%", "报告覆盖率") +
+      stat(cov.total_papers || 0, "检索论文") +
+      stat(unc.length, "未覆盖论文", unc.length ? "bad" : "") +
+      stat(sup, "可信声明") + `</div>`;
+    if (unc.length) {
+      head += `<details class="expander"><summary>⚠️ ${unc.length} 篇论文未在报告正文出现（点击展开）</summary>
+        <div class="exp-body">` + unc.map(u =>
+        `<div class="paper-card"><div class="paper-num" style="background:linear-gradient(135deg,#b91c1c,#ef4444)">!</div>
+          <div class="paper-main"><div class="paper-title">${esc(u.title)}</div>
+          <div class="paper-meta">arXiv:${esc(u.arxiv_id)}</div></div></div>`
+      ).join("") + `</div></details>`;
+    }
+  }
+  $("#tab-blind").innerHTML = head +
+    (md ? `<div class="md">${marked.parse(md)}</div>`
+        : `<div class="empty">暂无盲区报告——流水线完成后自动生成</div>`);
+}
+
 /* ---- 标签: 矛盾与张力 ---- */
 function renderConflicts() {
   const conflicts = CUR.r.conflicts || [];
@@ -2160,13 +2193,14 @@ const GUIDE_MD = `## 欢迎使用本系统 —— 3分钟看懂它是做什么�
 2. **💬 可信问答** — 直接用中文提问！系统只根据已核验的内容回答，**证据不够时宁可拒绝回答也不编造**——这是和普通AI对话最大的区别。
 3. **🤖 AI助手** — 任何疑问直接问：系统怎么用、指标什么含义、论文里某个方法的效果，它都能答。
 4. **📚 综述总结** — 叙述性综述（研究故事）+ AI观点（按"现有XX方法在XX场景具备XX优势，但普遍存在XX局限…"句式归纳研究缺口，适合找选题，仅供参考）。
-5. **📄 信息卡片** — 每篇论文被拆成了哪些知识点（声明）？🔵=方法、🟢=实验结果、🟠=局限性说明；每条声明旁有📎证据可跳PDF原文。
-6. **✅ 核验明细** — 哪些声明通过了核实？哪些被剔除、为什么？（被剔除≠论文差，只是那条表述与原文对不上）附Benchmark评测。
-7. **⚡ 矛盾与张力** — 论文之间打架了？🔴=正面对立，🟡=表面冲突（实验条件不同导致的）。
-8. **📊 综述表格** — 各论文的方法横向对比表。
-9. **🕸 引用图谱** — 论文之间谁引用谁的关系网（可拖拽交互）。
-10. **📚 论文原文** — 网页内直接阅读PDF全文，含 🔍 全文搜索（跨所有本地论文）、📝 阅读笔记、📖 核心名词速查。
-11. **⚔️ 对比阅读** — 挑两篇论文并排对比：背景/方法/结论/争议点一屏看清。
+5. **🎯 盲区与覆盖** — 系统反过头来批判自己的综述：哪些结论只有单一来源支撑（置信度低）、哪个检索方向命中论文太少、哪些论文收录了却没被报告使用（K4反向校验）。每个条目都附数据依据，可在快照文件中复核。
+6. **📄 信息卡片** — 每篇论文被拆成了哪些知识点（声明）？🔵=方法、🟢=实验结果、🟠=局限性说明；每条声明旁有📎证据可跳PDF原文。
+7. **✅ 核验明细** — 哪些声明通过了核实？哪些被剔除、为什么？（被剔除≠论文差，只是那条表述与原文对不上）附Benchmark评测。
+8. **⚡ 矛盾与张力** — 论文之间打架了？🔴=正面对立，🟡=表面冲突（实验条件不同导致的）。
+9. **📊 综述表格** — 各论文的方法横向对比表。
+10. **🕸 引用图谱** — 论文之间谁引用谁的关系网（可拖拽交互）。
+11. **📚 论文原文** — 网页内直接阅读PDF全文，含 🔍 全文搜索（跨所有本地论文）、📝 阅读笔记、📖 核心名词速查。
+12. **⚔️ 对比阅读** — 挑两篇论文并排对比：背景/方法/结论/争议点一屏看清。
 
 ### 🎯 检索模式
 

@@ -66,6 +66,8 @@ _SNAPSHOT_FILES = [
     # 老页面功能合并新增：论文完整元数据 / 综述总结 / Benchmark 评测
     ("meta.json", os.path.join(DATA, "papers_meta.json")),
     ("survey_summary.md", os.path.join(OUTPUT, "survey_summary.md")),
+    ("blindspots.md", os.path.join(OUTPUT, "blindspots.md")),
+    ("coverage_check.json", os.path.join(OUTPUT, "coverage_check.json")),
     ("benchmark.json", os.path.join(DATA, "benchmark",
                                     "benchmark_report.json")),
 ]
@@ -509,7 +511,8 @@ async def api_result(tid: str, request: Request):
              "review": "review_results.json", "conflicts": "conflicts.json",
              "evidence": "evidence_index.json", "plan": "plan.json",
              "meta": "meta.json", "glossary": "glossary.json",
-             "survey_md": "survey_summary.md", "benchmark": "benchmark.json"}
+             "survey_md": "survey_summary.md", "benchmark": "benchmark.json",
+             "blindspots": "blindspots.md", "coverage": "coverage_check.json"}
     for key, name in files.items():
         p = os.path.join(d, name)
         if not os.path.exists(p):
