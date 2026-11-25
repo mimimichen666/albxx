@@ -27,6 +27,7 @@ import json
 import re
 import time
 import bisect
+from collections import Counter
 from difflib import SequenceMatcher
 
 import llm_client
@@ -251,7 +252,8 @@ def numeric_mismatch(claim: str, evidence: str) -> list[str]:
     return misses
 
 
-def semantic_verify(claim_content: str, evidence_text: str) -> SemanticVerifyResult:
+def semantic_verify(claim_content: str, evidence_text: str,
+                    check_numeric: bool = True) -> SemanticVerifyResult:
     """
     用LLM核验单条声明（原子事实拆分法）
 
@@ -262,13 +264,25 @@ def semantic_verify(claim_content: str, evidence_text: str) -> SemanticVerifyRes
     核验走 config.VERIFIER_APIS 端点（K1异构核验）：未配置
     VERIFIER_API_KEY 时与主LLM同源（行为不变）；配置后核验与
     生成使用不同厂商模型，消除自我一致性偏差。
+    可选多模型投票（ENSEMBLE_VERIFY=1 + VERIFIER2_*）：多端点
+    各判一次，多数一致采纳，分歧取最严并标注"待人工复核"。
+
+    参数:
+        check_numeric: 是否启用第0级数值程序校验（消融实验
+            no_numeric 模式传 False，量化该层的独立贡献）
 
     返回:
         SemanticVerifyResult（atomic_facts + verdict/reason/confidence）
     """
     # ---- 第0级：数值程序校验（零LLM成本，确定性结论）----
-    misses = numeric_mismatch(claim_content, evidence_text)
-    if misses:
+    # 守卫: 仅当证据中完全没有任何百分比（无数字语境）时才程序拦截——
+    # 这是"模糊化"（提升12%→显著提升）的确定性信号。若证据里有其他
+    # 百分比，声明数值缺失更可能是"篡改"（原文95.2%声明97.2%），
+    # 方向性判定交给LLM语义核验（可判contradicted）；程序硬拦成
+    # unsupported会系统性吞掉contradicted类别，压低其召回。
+    misses = (numeric_mismatch(claim_content, evidence_text)
+              if check_numeric else [])
+    if misses and not _PCT_PAT.search(evidence_text.replace(",", "")):
         facts = ", ".join(misses)
         return SemanticVerifyResult(
             atomic_facts=[AtomicFactVerdict(
@@ -289,13 +303,37 @@ def semantic_verify(claim_content: str, evidence_text: str) -> SemanticVerifyRes
             f"【声明】{claim_content}\n\n"
             f"【原文片段】{evidence_text}"},
     ]
-    result = llm_client.chat_json(
-        messages, schema_class=SemanticVerifyResult,
-        temperature=config.TEMP_REVIEWER,  # 审查要求稳定，最低温度
-        apis=config.VERIFIER_APIS,  # K1: 核验走异构端点（未配置则同源回落）
-    )
-    # 程序化汇总：以原子事实的最坏非暂缓判定为准，覆盖模型的verdict字段
-    result.verdict = _aggregate_verdicts(result.atomic_facts)
+    # K1: 核验端点——默认单端点（未配置VERIFIER_API_KEY则同源回落）；
+    # ENSEMBLE_VERIFY=1 且配置VERIFIER2_*后启用多模型投票
+    endpoints = (config.VERIFIER_ENSEMBLE
+                 if (config.ENSEMBLE_VERIFY and config.VERIFIER_ENSEMBLE)
+                 else [config.VERIFIER_APIS])
+    results: list[SemanticVerifyResult] = []
+    for eps in endpoints:
+        r = llm_client.chat_json(
+            messages, schema_class=SemanticVerifyResult,
+            temperature=config.TEMP_REVIEWER,  # 审查要求稳定，最低温度
+            apis=eps,  # K1: 核验走异构端点（未配置则同源回落）
+        )
+        # 程序化汇总：以原子事实的最坏非暂缓判定为准，覆盖模型的verdict字段
+        r.verdict = _aggregate_verdicts(r.atomic_facts)
+        results.append(r)
+
+    result = results[0]
+    if len(results) > 1:
+        # 多模型投票（K1可选扩展）: 严格多数一致→采纳；否则取最严
+        # 判定并在reason标注待人工复核（分歧本身是重要的风险信号）
+        verdicts = [r.verdict for r in results]
+        top, cnt = Counter(verdicts).most_common(1)[0]
+        if cnt > len(verdicts) // 2:
+            result.verdict = top
+        else:
+            result.verdict = max(verdicts, key=lambda v: _AGG_ORDER[v])
+            result.reason = (f"【多模型核验分歧，待人工复核: "
+                             f"{'/'.join(verdicts)}】"
+                             f"{result.reason or ''}".strip())
+        result.confidence = round(
+            sum(r.confidence for r in results) / len(results), 3)
     return result
 
 
@@ -544,14 +582,16 @@ def run_d_benchmark(cases: list["BenchmarkCase"],
     不伪造判定、不污染指标（与正式流水线的llm_error协议一致）。
 
     消融实验（K2·B3优化）——ablation参数:
-      full          完整两级核验（程序化引用对齐 + LLM语义核验），默认
-      no_semantic   关闭LLM语义核验，判定退化为纯程序规则
-                    （引用对齐成功→supported，失败→unsupported）——
+      full          完整三级核验（程序对齐 + 数值校验 + LLM语义核验），默认
+      no_semantic   关闭LLM语义核验（含第0级数值校验），判定退化为纯程序
+                    规则（引用对齐成功→supported，失败→unsupported）——
                     回答"没有LLM语义核验，指标会掉多少"
                     （需样本提供quote_text+full_text，缺则跳过该样本）
-      no_alignment  关闭程序化引用对齐（引用一律放行），只留LLM语义核验
+      no_alignment  关闭程序化引用对齐（引用一律放行），只留语义核验
                     ——回答"没有逐字对齐兜底，伪造引用漏网多少"
-    三种模式各跑一遍即得消融对比表（benchmark.py ablation 子命令）。
+      no_numeric    仅关闭第0级数值程序校验，其余两级全开——
+                    回答"K1数值校验这一层独立贡献多少"
+    各模式各跑一遍即得消融对比表（benchmark.py ablation 子命令）。
 
     指标: 逐类 P/R/F1 + Macro-F1 + 误放行率
       误放行率 = (gold为坏声明 却被预测为通过) / (gold坏声明总数)
@@ -560,7 +600,7 @@ def run_d_benchmark(cases: list["BenchmarkCase"],
     """
     from models import BenchmarkCase, BenchmarkReport, BenchmarkResult
 
-    if ablation not in ("full", "no_semantic", "no_alignment"):
+    if ablation not in ("full", "no_semantic", "no_alignment", "no_numeric"):
         raise ValueError(f"未知消融模式: {ablation}")
 
     if not cases:
@@ -589,7 +629,9 @@ def run_d_benchmark(cases: list["BenchmarkCase"],
                     case.quote_text, _normalize(case.full_text))
                 verdict = "supported" if predicted_alignment else "unsupported"
             else:
-                sv = semantic_verify(case.claim_content, case.evidence_text)
+                sv = semantic_verify(
+                    case.claim_content, case.evidence_text,
+                    check_numeric=(ablation != "no_numeric"))
                 verdict = sv.verdict
                 if case.quote_text is not None and case.full_text is not None:
                     predicted_alignment = quote_alignment(
@@ -604,6 +646,13 @@ def run_d_benchmark(cases: list["BenchmarkCase"],
             raise  # 预算耗尽直接中止整个benchmark
         except Exception as e:
             print(f"  ⚠ [{case.case_id}] 语义核验调用失败，跳过该样本: {e}")
+            errored_ids.append(case.case_id)
+            continue
+        if verdict == "abstained":
+            # 协议口径: 证据不足的暂缓绝不计为幻觉也不评测
+            # （"核验失败"和"证实造假"是两回事），计errored跳过
+            print(f"  ⚠ [{case.case_id}] 语义核验全部原子事实暂缓"
+                  f"(abstained)，跳过该样本")
             errored_ids.append(case.case_id)
             continue
         kept_cases.append(case)

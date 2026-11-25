@@ -187,7 +187,7 @@ class SemanticVerifyResult(BaseModel):
     程序化推导，保证与原子事实严格一致（防止模型自相矛盾）。
     """
     atomic_facts: list[AtomicFactVerdict] = Field(
-        description="从声明拆出的原子事实及逐条判定", min_length=1, max_length=6,
+        description="从声明拆出的原子事实及逐条判定", min_length=1, max_length=9,
     )
     verdict: Literal[
         "supported", "unsupported", "contradicted", "abstained"

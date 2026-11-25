@@ -1,0 +1,106 @@
+{
+  "_readme": "K3·A3版面感知解析效果评测（layout_eval.py自动生成）",
+  "generated_at": "2026-11-22T21:00:07",
+  "sample_size": 10,
+  "seed": 2026,
+  "rows": [
+    {
+      "arxiv_id": "2611.24518",
+      "pages": 14,
+      "two_col_pages": 14,
+      "formula_removed": 191,
+      "quotes": 8,
+      "hit_off": 8,
+      "hit_on": 8
+    },
+    {
+      "arxiv_id": "2611.23530",
+      "pages": 37,
+      "two_col_pages": 33,
+      "formula_removed": 91,
+      "quotes": 8,
+      "hit_off": 8,
+      "hit_on": 8
+    },
+    {
+      "arxiv_id": "doi_10.1007_s11704-024-40231-1",
+      "pages": 26,
+      "two_col_pages": 25,
+      "formula_removed": 86,
+      "quotes": 4,
+      "hit_off": 4,
+      "hit_on": 4
+    },
+    {
+      "arxiv_id": "2611.24661",
+      "pages": 29,
+      "two_col_pages": 4,
+      "formula_removed": 12,
+      "quotes": 8,
+      "hit_off": 8,
+      "hit_on": 8
+    },
+    {
+      "arxiv_id": "1510.08829",
+      "pages": 9,
+      "two_col_pages": 1,
+      "formula_removed": 19,
+      "quotes": 0,
+      "hit_off": 0,
+      "hit_on": 0
+    },
+    {
+      "arxiv_id": "2502.20507",
+      "pages": 7,
+      "two_col_pages": 6,
+      "formula_removed": 0,
+      "quotes": 0,
+      "hit_off": 0,
+      "hit_on": 0
+    },
+    {
+      "arxiv_id": "2011.05280",
+      "pages": 12,
+      "two_col_pages": 12,
+      "formula_removed": 144,
+      "quotes": 0,
+      "hit_off": 0,
+      "hit_on": 0
+    },
+    {
+      "arxiv_id": "2402.01364",
+      "pages": 9,
+      "two_col_pages": 9,
+      "formula_removed": 16,
+      "quotes": 0,
+      "hit_off": 0,
+      "hit_on": 0
+    },
+    {
+      "arxiv_id": "2407.21783",
+      "pages": 92,
+      "two_col_pages": 14,
+      "formula_removed": 84,
+      "quotes": 0,
+      "hit_off": 0,
+      "hit_on": 0
+    },
+    {
+      "arxiv_id": "2407.20534",
+      "pages": 7,
+      "two_col_pages": 0,
+      "formula_removed": 4,
+      "quotes": 0,
+      "hit_off": 0,
+      "hit_on": 0
+    }
+  ],
+  "totals": {
+    "pages": 242,
+    "two_col": 118,
+    "removed": 647,
+    "q": 28,
+    "hit_off": 28,
+    "hit_on": 28
+  }
+}

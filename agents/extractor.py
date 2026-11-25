@@ -16,6 +16,7 @@ extractor.py —— 提取Agent
 
 import os
 import json
+import re
 
 import pymupdf
 
@@ -35,6 +36,33 @@ def _clean_page_text(text: str) -> str:
 
 
 # ---------------------------------------------------------------
+# K3·A3优化：公式/乱码段清理（高符号密度块剔除）
+# ---------------------------------------------------------------
+# 公式块特征：短、符号密集（=+∑∫括号下标）、几乎没有英文正文虚词。
+# 三重条件同时满足才剔除（宁漏勿误伤：数学论文正文段也含公式，
+# 误剔会破坏声明引用的完整性）。开关 config.FORMULA_FILTER。
+_FORMULA_STOPWORDS = frozenset(
+    "the of and in to a is are for with that on as by an be this it"
+    .split())
+
+
+def _is_formula_like(text: str) -> bool:
+    """保守识别公式/乱码块: 短 + 符号密度>0.30 + 正文虚词<3
+    （希腊字母等Unicode字母在PDF公式块中大量出现且被isalnum
+    认定为字母，故密度阈值取0.30；误伤防线主要是虚词计数）"""
+    t = text.strip()
+    if not t or len(t) >= 200:
+        return False
+    sym = sum(1 for c in t if not (c.isalnum() or c.isspace()))
+    if sym / len(t) <= 0.30:
+        return False
+    words = re.findall(r"[a-zA-Z]+", t.lower())
+    if sum(1 for w in words if w in _FORMULA_STOPWORDS) >= 3:
+        return False
+    return True
+
+
+# ---------------------------------------------------------------
 # K3·A3优化：版面感知解析（2026-11新增）
 # ---------------------------------------------------------------
 # 问题: PDF是"排版指令的集合"而非文本流。page.get_text("text")按
@@ -50,6 +78,12 @@ def _page_text_layout(page) -> str:
     """版面感知的单页文本重组（K3）。返回该页按阅读顺序拼接的文本。"""
     blocks = page.get_text("blocks")  # [x0, y0, x1, y1, text, block_no, type]
     text_blocks = [b for b in blocks if b[6] == 0 and (b[4] or "").strip()]
+    # 公式/乱码段清理: 剔除高符号密度块；但保留量不足一半时视为
+    # 公式密集型论文（整页数学推导），放弃剔除防止破坏正文完整性
+    if config.FORMULA_FILTER:
+        kept = [b for b in text_blocks if not _is_formula_like(b[4])]
+        if kept and len(kept) * 2 >= len(text_blocks):
+            text_blocks = kept
     # 块太少谈不上分栏（封面/纯图页），退回默认文本流
     if len(text_blocks) < 3:
         return page.get_text("text")

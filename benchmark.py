@@ -185,16 +185,17 @@ def run(save: bool = True) -> "BenchmarkReport":
 
 def ablation(save: bool = True) -> None:
     """
-    消融实验（K2·B3）：完整核验 / 仅程序对齐 / 仅语义核验 三模式对比。
+    消融实验（K2·B3）：四级核验逐层关闭对比。
 
-    回答答辩必问的"两级核验各自贡献多少"：
+    回答答辩必问的"每层核验各自贡献多少"：
       - full vs no_alignment  → 一级程序化对齐的价值（拦伪造引用）
-      - full vs no_semantic   → 二级LLM语义核验的价值（拦语义性错误）
+      - full vs no_semantic   → LLM语义核验+数值校验整体的价值
+      - full vs no_numeric    → K1数值程序校验的独立价值（拦模糊化）
     结果落盘 benchmarks 侧的 ablation_results.json（data/benchmark/）。
     """
     cases = load_cases()
     print(f"[消融实验] 加载固定测试集: {len(cases)} 例")
-    modes = ("full", "no_semantic", "no_alignment")
+    modes = ("full", "no_semantic", "no_alignment", "no_numeric")
     reports: dict[str, dict] = {}
     for mode in modes:
         report = run_d_benchmark(cases, ablation=mode)
@@ -205,24 +206,26 @@ def ablation(save: bool = True) -> None:
         reports[mode] = payload
 
     # ---- 打印对比表 ----
-    print("\n" + "=" * 72)
+    print("\n" + "=" * 86)
     print("🔬 消融实验对比（数值越高越好；误放行率越低越好）")
-    print("=" * 72)
-    print(f"{'指标':<22}{'完整核验':>12}{'仅程序对齐':>13}{'仅语义核验':>13}")
-    print("-" * 72)
+    print("=" * 86)
+    print(f"{'指标':<20}{'完整核验':>12}{'仅程序对齐':>13}"
+          f"{'仅语义核验':>13}{'仅关数值校验':>14}")
+    print("-" * 86)
     keys = [("verdict_accuracy", "Verdict Accuracy"),
             ("alignment_accuracy", "Alignment Accuracy"),
             ("macro_f1", "Macro-F1"),
             ("false_pass_rate", "误放行率(低好)")]
     for key, name in keys:
         vals = [reports[m].get(key, 0.0) for m in modes]
-        print(f"{name:<22}{vals[0]:>12.3f}{vals[1]:>13.3f}{vals[2]:>13.3f}")
+        print(f"{name:<20}{vals[0]:>12.3f}{vals[1]:>13.3f}"
+              f"{vals[2]:>13.3f}{vals[3]:>14.3f}")
     for m in modes:
         ci = reports[m].get("confidence_intervals") or {}
         if ci.get("macro_f1"):
             lo, hi = ci["macro_f1"]
             print(f"  {m:<12} Macro-F1 95%CI [{lo:.3f}, {hi:.3f}]")
-    print("=" * 72)
+    print("=" * 86)
 
     if save:
         os.makedirs(OUT_DIR, exist_ok=True)

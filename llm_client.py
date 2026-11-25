@@ -142,8 +142,11 @@ def chat(messages, temperature=0.2, model=None, max_retries=None,
     # 不同的调用（模型/厂商可能不同），缓存不能互相串
     cache_key = None
     if config.LLM_CACHE_ENABLED and use_cache:
-        cache_key = _fingerprint(
-            model + ("@verifier" if apis else ""), temperature, messages)
+        # 后缀取端点名: 主端点无后缀, 各核验端点按name隔离
+        # （多模型投票时"核验/核验2/核验3"互不串缓存）
+        suffix = ("@" + str(apis[0].get("name", "verifier"))
+                  if apis else "")
+        cache_key = _fingerprint(model + suffix, temperature, messages)
         hit = _cache.get_llm(cache_key)
         if hit is not None:
             usage_stats["cache_hits"] += 1
@@ -268,7 +271,7 @@ def chat_stream(messages, temperature=0.2, model=None, max_retries=2):
 
 
 def chat_json(messages, schema_class, temperature=0.1, model=None,
-              use_cache=True, apis=None, max_retries=None, parse_rounds=3):
+              use_cache=True, max_retries=None, parse_rounds=3, apis=None):
     """
     要求模型输出 JSON 并解析为 Pydantic 对象
 
@@ -283,7 +286,8 @@ def chat_json(messages, schema_class, temperature=0.1, model=None,
                    即使上次经历了JSON修复重试，重跑也只需一次查询
         apis: 端点列表（None=config.LLM_APIS）。核验侧传
               config.VERIFIER_APIS 走独立厂商端点（K1异构核验），
-              且缓存键带@verifier后缀与主端点的结果互相隔离
+              且缓存键带端点名后缀（如"@核验"）与主端点及
+              其他核验端点的结果互相隔离
         max_retries: 透传给 chat() 的网络重试上限。None=用全局默认
                      (config.LLM_MAX_RETRIES)。交互式端点(如词云)应传
                      更小值——默认配置下最坏耗时 =
@@ -379,8 +383,11 @@ def chat_json(messages, schema_class, temperature=0.1, model=None,
     # 键 = schema名 + 温度 + 模型 + 注入格式要求后的完整消息
     cache_key = None
     if config.LLM_CACHE_ENABLED and use_cache:
+        # 后缀取端点名（多核验端点互不串缓存，主端点无后缀）
+        suffix = ("@" + str(apis[0].get("name", "verifier"))
+                  if apis else "")
         cache_key = _fingerprint(
-            (model or config.MODEL_NAME) + ("@verifier" if apis else ""),
+            (model or config.MODEL_NAME) + suffix,
             temperature, messages)
         hit = _cache.get_llm(cache_key)
         if hit is not None:
@@ -409,8 +416,7 @@ def chat_json(messages, schema_class, temperature=0.1, model=None,
         # use_cache=False: 结构化调用的缓存在本函数这一层做，
         # 避免把"解析失败的原始输出"存进chat()层的缓存污染重跑
         raw = chat(messages, temperature=temperature, model=model,
-                   use_cache=False, apis=apis,
-                   max_retries=max_retries)
+                   max_retries=max_retries, use_cache=False, apis=apis)
         try:
             # 剥离可能的 ```json ``` 包裹
             text = raw.strip()

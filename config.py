@@ -51,6 +51,19 @@ VERIFIER_API_KEY = _clean(os.environ.get("VERIFIER_API_KEY", ""))
 VERIFIER_BASE_URL = _clean(os.environ.get("VERIFIER_BASE_URL", ""))
 VERIFIER_MODEL = _clean(os.environ.get("VERIFIER_MODEL", ""))
 
+# K1可选扩展——多模型投票核验（三投票）：
+# ENSEMBLE_VERIFY=1 且配置 VERIFIER2_API_KEY（推荐再加 VERIFIER3_*）
+# 后，语义核验由多个独立厂商模型各判一次：严格多数一致→采纳该判定；
+# 无多数（各不相同或两票分歧）→取最严判定并在reason标注"待人工复核"。
+# 默认0 = 单核验端点（与K1基础版行为一致，不增加调用成本）。
+ENSEMBLE_VERIFY = os.environ.get("ENSEMBLE_VERIFY", "0") == "1"
+VERIFIER2_API_KEY = _clean(os.environ.get("VERIFIER2_API_KEY", ""))
+VERIFIER2_BASE_URL = _clean(os.environ.get("VERIFIER2_BASE_URL", ""))
+VERIFIER2_MODEL = _clean(os.environ.get("VERIFIER2_MODEL", ""))
+VERIFIER3_API_KEY = _clean(os.environ.get("VERIFIER3_API_KEY", ""))
+VERIFIER3_BASE_URL = _clean(os.environ.get("VERIFIER3_BASE_URL", ""))
+VERIFIER3_MODEL = _clean(os.environ.get("VERIFIER3_MODEL", ""))
+
 # 各服务商的默认参数（自动识别时使用）
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 DEEPSEEK_DEFAULT_MODEL = "deepseek-chat"
@@ -92,6 +105,10 @@ LLM_CACHE_ENABLED = os.environ.get("LLM_CACHE", "1") == "1"
 #     左右栏交错导致的"声明与原文对不上→误判幻觉"）；
 # 0 = 回退旧的纯文本流抽取（灰度开关，解析结果异常时可快速回退）
 LAYOUT_AWARE_PDF = os.environ.get("LAYOUT_AWARE_PDF", "1") == "1"
+
+# K3·A3公式清理: 1 = 版面重组时剔除"高符号密度且无正文虚词"的
+#     公式/乱码块（保守三重条件，宁漏勿误伤正文）；0 = 保留全部块
+FORMULA_FILTER = os.environ.get("FORMULA_FILTER", "1") == "1"
 
 # ---------------------------------------------------------------
 # 二、各Agent的温度参数（temperature）
@@ -233,4 +250,25 @@ if VERIFIER_API_KEY:
         "base_url": VERIFIER_BASE_URL,
         "model": VERIFIER_MODEL,
     }]
+
+# 多模型投票核验的端点组（K1可选扩展）：[核验1, 核验2(, 核验3)]
+# 空列表 = 未启用投票，semantic_verify 回落单核验端点
+VERIFIER_ENSEMBLE: list = []
+if ENSEMBLE_VERIFY and VERIFIER2_API_KEY:
+    VERIFIER_ENSEMBLE = [VERIFIER_APIS, [{
+        "name": "核验2",
+        "api_key": VERIFIER2_API_KEY,
+        "base_url": VERIFIER2_BASE_URL,
+        "model": VERIFIER2_MODEL,
+    }]]
+    if VERIFIER3_API_KEY:
+        VERIFIER_ENSEMBLE.append([{
+            "name": "核验3",
+            "api_key": VERIFIER3_API_KEY,
+            "base_url": VERIFIER3_BASE_URL,
+            "model": VERIFIER3_MODEL,
+        }])
+elif ENSEMBLE_VERIFY:
+    print("[config] ENSEMBLE_VERIFY=1 但未配置VERIFIER2_API_KEY，"
+          "投票核验未启用（回落单核验端点）")
 
