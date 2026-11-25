@@ -346,6 +346,27 @@ def run_pipeline(topic: str, top_k: int, mode: str, years: int,
             log(f"综述总结自动生成失败(不影响流水线): {_sv_err}",
                 stage="综述总结")
 
+        # ---- 9. K4 全覆盖反向校验 + P0-1 盲区报告（2026-11-25）----
+        # 纯本地统计聚合(零检索调用) + 1次LLM解读; 失败不影响流水线
+        check_cancel()
+        try:
+            from agents import coverage, blindspot
+            log("覆盖分析: K4反向校验+盲区聚合（纯本地统计）...",
+                stage="盲区分析")
+            cov = coverage.run(topic)
+            _k4 = cov.get("k4") or {}
+            log(f"K4全覆盖反向校验: 报告覆盖率 "
+                f"{_k4.get('coverage_rate', 0):.0%}"
+                f"（覆盖{len(_k4.get('covered') or [])}篇 / "
+                f"未覆盖{len(_k4.get('uncovered') or [])}篇）",
+                stage="盲区分析")
+            log("P0-1: 生成审稿人视角盲区报告...", stage="盲区分析")
+            blindspot.generate(topic, cov)
+            log("盲区报告完成: 已保存 output/blindspots.md "
+                "+ output/coverage_check.json", stage="盲区分析")
+        except Exception as _bs_err:
+            log(f"盲区分析失败(不影响流水线): {_bs_err}", stage="盲区分析")
+
         return report
     finally:
         # 取消/异常时不再等队列里的提取任务(进行中的会自然跑完);
