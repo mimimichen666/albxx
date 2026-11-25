@@ -523,6 +523,24 @@ async def api_result(tid: str, request: Request):
     return out
 
 
+def _trim_abstract(text: str, zh_chars: int = 180, en_words: int = 30):
+    """按语种截断摘要：中文按字（180 字），英文按词（30 词）。
+
+    背景：原先统一 `abstract[:180]`，对英文论文等于只给 180 个字母（约 30 个词
+    且常在单词中间截断），既过短又不美观。英文改为按词数截断，词边界干净。
+    返回 (截断文本, 单位标签)，单位标签供前端展示"前 180 字 / 前 30 词"。
+    """
+    s = (text or "").strip()
+    if not s:
+        return "", "字"
+    cjk = sum(1 for ch in s if "\u4e00" <= ch <= "\u9fff")
+    # 中文按字数：CJK 字符有一定数量，或占比过半
+    if cjk >= 10 or cjk * 2 >= len(s):
+        return s[:zh_chars], "字"
+    words = s.split()
+    return " ".join(words[:en_words]), "词"
+
+
 @app.get("/api/tasks/{tid}/bridge")
 def api_bridge(tid: str, request: Request):
     """结果中转页数据：智能引导在主题尾部注入「重点关注：…」关键词，
@@ -598,6 +616,7 @@ def api_bridge(tid: str, request: Request):
                              "in_claims": in_c})
                 cov[i] += 1
         card = card_map.get(p.get("arxiv_id"), {})
+        abs_txt, abs_unit = _trim_abstract(abstract)   # 中文180字 / 英文30词
         papers.append({
             "arxiv_id": p.get("arxiv_id"),
             "title": title,
@@ -609,7 +628,11 @@ def api_bridge(tid: str, request: Request):
             "matches": hits,
             # 命中得分：标题命中 3 分/个，摘要命中 1 分/个
             "score": sum(3 if h["in_title"] else 1 for h in hits),
-            "abstract": abstract[:180],
+            "abstract": abs_txt,
+            # 前端据此显示"摘要（前 180 字 / 前 30 词）"，避免英文显示错单位
+            "abstract_label": f"前 {180 if abs_unit == '字' else 30} {abs_unit}",
+            # 仅真正截断时才追加省略号（短摘要保持原样）
+            "abstract_truncated": len(abs_txt) < len(abstract.strip()),
         })
     papers.sort(key=lambda x: (-x["score"], -(x["cited_by"] or 0)))
     return {
@@ -1191,8 +1214,10 @@ def api_glossary(req: GlossaryReq, request: Request):
         "application(应用场景/用在哪里)、background(背景知识/为什么重要)，每类都要有；\n"
         "2. weight 为该术语与主题的相关度 1~10，核心概念给 9~10，背景知识给 3~6；\n"
         "3. term_en 用领域标准英文术语，term_zh 用规范中文译名；\n"
-        "4. explanation 为不超过80字的一句话定义，" + style + "；\n"
-        "5. 只输出术语本身，禁止输出任何文献引用、arXiv编号或作者名。"
+        "4. explanation 一律填空字符串\"\"——解释由前端在用户点击术语时按需生成，"
+        "此处严禁生成任何解释文本，以大幅缩短响应时间；\n"
+        "5. 只输出术语本身，禁止输出任何文献引用、arXiv编号或作者名。\n"
+        "术语选择的偏好视角：" + style
     )
     user_prompt = f"研究主题：{topic}\n用户阶段：{req.stage}"
     try:
@@ -1213,6 +1238,59 @@ def api_glossary(req: GlossaryReq, request: Request):
         "topic_en": glossary.topic_en,
         "terms": [t.model_dump() for t in glossary.terms],
     }
+
+
+class TermExplainReq(BaseModel):
+    topic: str
+    identity: str = "硕士生"
+    term_zh: str
+    term_en: str = ""
+    category: str = "core"
+
+
+@app.post("/api/term-explain")
+def api_term_explain(req: TermExplainReq, request: Request):
+    """术语解释懒加载：词云请求不再生成 80 字解释（首屏 62s→约20s），
+    用户点击术语时按需调用本端点生成单个解释（2~4 秒，带缓存秒回重复点击）。"""
+    _check_auth(request)
+    topic = (req.topic or "").strip()
+    term_zh = (req.term_zh or "").strip()
+    if not topic or not term_zh:
+        raise HTTPException(400, "topic 与 term_zh 不能为空")
+    try:
+        import models as _models
+        import llm_client as _llm
+    except Exception as e:
+        raise HTTPException(500, f"LLM 客户端不可用: {e}")
+    if str(BASE) not in sys.path:
+        sys.path.insert(0, str(BASE))
+    style_map = {
+        "本科生": "面向零基础本科生：优先使用生活化类比，避免未解释的行话",
+        "硕士生": "面向研究生：可用标准学术词汇，概念需点到定义",
+        "博士生": "面向领域博士：用高密度专业表述，直接给方法论脉络",
+        "研究者": "面向研究者：精确使用领域惯用语与前沿术语",
+        "工程师": "面向工程师：侧重实现与落地视角，如硬件、开销、部署",
+    }
+    style = style_map.get(req.identity, style_map["硕士生"])
+    sys_prompt = (
+        "你是学术导航助手。用一句不超过80字的中文解释给定的学术术语，"
+        "说明它是什么/怎么用，结合研究主题给出语境。" + style + "。"
+        "禁止输出文献引用、arXiv编号或作者名。"
+    )
+    user_prompt = (f"研究主题：{topic}\n术语：{term_zh}"
+                   + (f"（{req.term_en}）" if req.term_en else "")
+                   + f"\n类别：{req.category}")
+    try:
+        r = _llm.chat_json(
+            [{"role": "system", "content": sys_prompt},
+             {"role": "user", "content": user_prompt}],
+            _models.TermExplain,
+            temperature=0.4,
+            max_retries=1, parse_rounds=2,
+        )
+    except Exception as e:
+        raise HTTPException(502, f"解释生成失败: {e}")
+    return {"explanation": r.explanation}
 
 
 # 静态前端（放在最后，避免吞掉 /api/*）

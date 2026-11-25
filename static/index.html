@@ -22,8 +22,10 @@ body { font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, san
        background-image: radial-gradient(1200px 400px at 80% -80px, rgba(124,58,237,.07), transparent),
                          radial-gradient(900px 320px at 8% -60px, rgba(79,70,229,.06), transparent);
        background-repeat: no-repeat;
-       color: var(--ink); font-size: 14px; }
-.wrap { max-width: 1280px; margin: 0 auto; padding: 20px 16px 32px; }
+       color: var(--ink); font-size: 14px;
+       /* 长英文词/URL/公式允许折行，不再把布局撑出横向滚动条 */
+       overflow-wrap: break-word; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 20px 16px 32px; }
 header { display: flex; align-items: center; gap: 12px; padding: 4px 0 18px; }
 header h1 { font-size: 20px; letter-spacing: .2px;
             background: var(--brand-grad); -webkit-background-clip: text;
@@ -38,7 +40,7 @@ header .sub { color: var(--muted); font-size: 12.5px; }
 @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .55 } }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
 
-.layout { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
+.layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 16px; align-items: start; }
 .card { background: var(--card); border: 1px solid var(--border);
         border-radius: 14px; padding: 16px; box-shadow: var(--shadow);
         animation: fadeUp .3s ease both; }
@@ -94,7 +96,7 @@ button:active { transform: scale(.98); }
                  animation: pulse 1.8s ease-in-out infinite; }
 .stage-chip.done-chip { color: var(--green); border-color: #a7f3d0; background: var(--green-lt); }
 .stage-chip.done-chip::before { content: "✓ "; font-weight: 700; }
-#logs { height: 230px; overflow-y: auto; background: #0b1220; color: #93a4c4;
+#logs { height: 230px; overflow-y: auto; overflow-x: auto; background: #0b1220; color: #93a4c4;
         border-radius: 10px; padding: 12px 14px; font-family: Consolas, "Cascadia Mono", monospace;
         font-size: 12px; line-height: 1.75; border: 1px solid #1e2a44; }
 #logs .st { color: #a5b4fc; font-weight: 700; }
@@ -166,7 +168,7 @@ button:active { transform: scale(.98); }
 .pill.ok { background: var(--green-lt); color: var(--green); border-color: #a7f3d0; }
 .conf-topic { font-size: 13px; color: var(--ink); font-weight: 700; }
 .conf-sev { font-size: 11px; color: var(--muted); margin-left: auto; }
-.conf-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.conf-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 9px; }
 @media (max-width: 860px) { .conf-pair { grid-template-columns: 1fr; } }
 .conf-side { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
   background: #fafbff; }
@@ -274,7 +276,7 @@ iframe { width: 100%; height: 540px; border: 1px solid var(--border); border-rad
 /* 弹层（证据穿透） */
 #modal { position: fixed; inset: 0; background: rgba(15,23,42,.48); z-index: 50;
   display: flex; align-items: center; justify-content: center; padding: 16px; }
-#modal .box { background: #fff; border-radius: 16px; max-width: 920px; width: 100%;
+#modal .box { background: #fff; border-radius: 16px; max-width: min(920px, 94vw); width: 100%;
   max-height: 92vh; overflow-y: auto; padding: 22px 26px; box-shadow: var(--shadow-lg); }
 #modal h3 { font-size: 14.5px; margin-bottom: 8px; }
 #modal img { max-width: 100%; border: 1px solid var(--border); border-radius: 8px;
@@ -301,13 +303,13 @@ iframe { width: 100%; height: 540px; border: 1px solid var(--border); border-rad
   margin-bottom: 8px; background: #fff; font-size: 12.5px; line-height: 1.6; }
 .note-item .np { font-weight: 700; color: var(--brand); }
 .note-item .nq { color: var(--muted); font-style: italic; }
-.cmp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.cmp-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 @media (max-width: 860px) { .cmp-grid { grid-template-columns: 1fr; } }
 .cmp-card { border: 1px solid var(--border); border-radius: 12px; padding: 14px;
   background: #fff; box-shadow: var(--shadow); }
 .cmp-card h3 { font-size: 13.5px; margin-bottom: 4px; }
 .cmp-card .cm { font-size: 11.5px; color: var(--muted); margin-bottom: 8px; }
-.reader-grid { display: grid; grid-template-columns: 2.6fr 1fr; gap: 12px; }
+.reader-grid { display: grid; grid-template-columns: minmax(0, 2.6fr) minmax(0, 1fr); gap: 12px; }
 @media (max-width: 900px) { .reader-grid { grid-template-columns: 1fr; } }
 
 /* 滚动条 */
@@ -344,7 +346,7 @@ iframe { width: 100%; height: 540px; border: 1px solid var(--border); border-rad
 .vbadge { font-weight: 700; font-size: 12px; border-radius: 999px; padding: 3px 12px; }
 .veid { font-family: monospace; font-size: 11.5px; color: var(--muted); }
 .vpaper { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap; max-width: 420px; }
+  white-space: nowrap; min-width: 0; max-width: min(420px, 100%); }
 .vclaim { font-size: 13.5px; line-height: 1.6; margin: 6px 0 10px; color: var(--ink); }
 .vlvl { background: var(--bg); border-radius: 6px; padding: 8px 10px; font-size: 12.5px;
   margin: 4px 0; line-height: 1.55; color: var(--slate); }
@@ -356,6 +358,40 @@ iframe { width: 100%; height: 540px; border: 1px solid var(--border); border-rad
 .vquote { border-left: 3px solid var(--border); padding-left: 8px; }
 .vmiss { font-size: 12px; color: var(--amber); background: var(--amber-lt);
   border-radius: 6px; padding: 6px 10px; margin-top: 10px; }
+/* 卡片栅格：宽屏一行两列，窄屏自动退回单列 */
+.vgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px; align-items: start; }
+.vgrid .vcard { margin: 0; height: 100%; }
+@media (max-width: 1080px) { .vgrid { grid-template-columns: 1fr; } }
+/* 证据缩略图：固定高度裁剪顶部（PDF 首行高亮通常在页首），点击看大图 */
+.vgrid .vimg-wrap img { width: 100%; height: 200px; object-fit: cover;
+  object-position: top center; cursor: zoom-in; transition: filter .15s; }
+.vgrid .vimg-wrap img:hover { filter: brightness(1.05) contrast(1.03); }
+.vimg-zoom-hint { font-size: 10.5px; color: var(--muted); text-align: right; margin-top: 2px; }
+/* 灯箱：点击缩略图后的全屏大图查看 */
+#vlightbox { position: fixed; inset: 0; z-index: 200; background: rgba(10, 14, 25, .82);
+  display: flex; align-items: center; justify-content: center; padding: 28px;
+  cursor: zoom-out; animation: vlb-in .16s ease-out; }
+@keyframes vlb-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { #vlightbox { animation: none; } }
+.vlb-box { max-width: min(1100px, 92vw); max-height: 88vh; display: flex;
+  flex-direction: column; gap: 10px; }
+.vlb-box img { max-width: 100%; max-height: 80vh; object-fit: contain;
+  border-radius: 8px; box-shadow: 0 18px 60px rgba(0, 0, 0, .5); background: #fff; }
+.vlb-cap { color: #e5e9f2; font-size: 12.5px; text-align: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
+/* 统计证据槽（P1-2 研究空白用：检索式+计数+年趋势，替代 PDF 截图） */
+.vstat { margin-top: 10px; }
+.vst-tab { border-collapse: collapse; font-size: 12px; margin: 6px 0; width: 100%; }
+.vst-tab td { padding: 3px 8px; border-bottom: 1px dashed var(--border); color: var(--slate); }
+.vst-tab td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.vst-spark { display: flex; align-items: flex-end; gap: 6px; height: 50px; margin-top: 8px; }
+.vst-bar { display: flex; flex-direction: column; align-items: center;
+  justify-content: flex-end; flex: 1; height: 100%; }
+.vst-bar i { display: block; width: 70%; min-height: 2px; background: var(--brand);
+  border-radius: 2px 2px 0 0; }
+.vst-bar em { font-size: 10px; color: var(--muted); font-style: normal; margin-top: 2px; }
+.vst-cap { font-size: 11px; color: var(--muted); margin-top: 4px; }
 
 /* ---- 检索前引导（词云向导 · 旅程式设计 v2） ---- */
 #btn-ob { width: 100%; margin-top: 10px; background: var(--card); border: 1px solid var(--border);
@@ -478,7 +514,7 @@ iframe { width: 100%; height: 540px; border: 1px solid var(--border); border-rad
 .ob-preview { background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
   padding: 12px 14px; font-size: 13px; color: var(--slate); margin-bottom: 12px; line-height: 1.6; }
 .ob-preview b { color: var(--ink); }
-.ob-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.ob-grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; }
 .ob-est { font-size: 12px; color: var(--slate); background: var(--bg); border-radius: 8px;
   padding: 8px 12px; margin-top: 10px; line-height: 1.6; }
 
@@ -776,7 +812,11 @@ $("#btn-run").onclick = async () => {
 /* ---------------- 检索前引导（词云向导） ---------------- */
 const OB = { step: 1, topic: "", identity: "硕士生", stage: "入门了解", focus: "",
              glossary: null, sel: new Set(), openTerm: -1, loading: false,
-             final: null, focusTerms: null, lastStep: 0 };
+             final: null, focusTerms: null, lastStep: 0,
+             /* 词云预热（方案1）：主题/画像变动即后台静默生成，点"生成"时大概率秒开 */
+             pfTimer: 0, pfDoneKey: "", pfCache: {}, pfState: {},
+             /* 解释懒加载（方案2）：点击术语时按需生成，explBusy=进行中 explFail=失败待重试 */
+             explBusy: {}, explFail: {} };
 const OB_STAGES = ["入门了解", "开题调研", "正式综述", "追前沿", "交叉探索"];
 const OB_PRESET = {
   "入门了解": { mode: "mode1", fast: true,  top_k: 5,  years: 2 },
@@ -807,6 +847,33 @@ function obEstimate() {
   const f = OB.final;
   const min = f.fast ? 3 : (f.top_k <= 6 ? 8 : f.top_k <= 10 ? 15 : 25);
   return `⏱ 预计耗时约 ${min} 分钟${f.fast ? "（快速模式）" : ""} · 期间页面可关闭，任务在后台继续`;
+}
+
+/* ---- 词云预热（方案1）：输入主题/切换画像即后台静默生成，点"生成"时大概率秒开 ---- */
+function obPfKey() { return OB.topic.trim() + "|" + OB.identity + "|" + OB.stage; }
+function obSchedulePrefetch(delay) {
+  clearTimeout(OB.pfTimer);
+  OB.pfTimer = setTimeout(obMaybePrefetch, delay || 1200);
+}
+function obMaybePrefetch() {
+  if (OB.loading) return;
+  const key = obPfKey();
+  if (key === OB.pfDoneKey) return;              // 同一组合已预热过
+  if (!OB.topic || OB.topic.trim().length < 3) return;
+  OB.pfDoneKey = key;
+  OB.pfState[key] = "pending";
+  OB.pfCache[key] = api("/api/glossary", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ topic: OB.topic.trim(), identity: OB.identity, stage: OB.stage }),
+    timeoutMs: 90000
+  }).then(g => {
+    OB.pfState[key] = "ready";
+    return g;
+  }).catch(e => {
+    delete OB.pfCache[key];                      // 失败不缓存，点"生成"时会重试
+    OB.pfState[key] = "failed";
+    return null;                                 // 不 re-throw：预热失败静默，生成时由 obGenerate 重试
+  });
 }
 
 /* ---- 3D 词云球：斐波那契球面分布 + 深度投影 + 拖拽/悬停交互 ---- */
@@ -910,9 +977,11 @@ function obRender() {
   const anim = OB.lastStep !== OB.step ? `<div class="ob-anim">` : `<div>`;
   OB.lastStep = OB.step;
   if (OB.step === 1) {
+    const pfReady = OB.pfState[obPfKey()] === "ready";
     el.innerHTML = `${obBar()}${anim}
       <div class="ob-field"><label>研究主题</label>
-        <textarea id="ob-topic" placeholder="例如：脉冲神经网络的高效训练方法">${esc(OB.topic)}</textarea></div>
+        <textarea id="ob-topic" placeholder="例如：脉冲神经网络的高效训练方法"
+          oninput="OB.topic=this.value;obSchedulePrefetch()">${esc(OB.topic)}</textarea></div>
       <div class="ob-field"><label>你的身份（影响术语解释的讲法）</label>
         ${obPillGroup(["本科生", "硕士生", "博士生", "研究者", "工程师"], OB.identity, "OB.identity")}</div>
       <div class="ob-field"><label>当前阶段（决定检索预设）</label>
@@ -923,11 +992,13 @@ function obRender() {
                oninput="OB.focus=this.value"></div>
       <div class="ob-actions">
         <button class="ob-btn grow" id="ob-gen" onclick="obGenerate()"
-                ${OB.loading ? "disabled" : ""}>${OB.loading ? "🪄 生成中…" : "🪄 生成我的专属词云"}</button>
+                ${OB.loading ? "disabled" : ""}>${OB.loading ? "🪄 生成中…"
+                  : (pfReady ? "✨ 词云已就绪 · 点击进入" : "🪄 生成我的专属词云")}</button>
         ${OB.loading ? `<button class="ob-btn ghost" onclick="obCancelGen()">✖ 取消</button>` : ""}
         <button class="ob-btn ghost" onclick="closeModal()">跳过引导</button></div>
       ${OB.error ? `<div class="ob-preview">⚠️ ${esc(OB.error)}——可直接跳过引导，用左侧表单检索</div>` : ""}</div>`;
     if (!OB.loading) $("#ob-topic").value = OB.topic;
+    obSchedulePrefetch(500);                     // 打开向导/切换画像后自动预热
     return;
   }
   if (OB.step === 2) {
@@ -951,14 +1022,30 @@ function obRender() {
           ${esc(x.t.term_zh)} ${esc(x.t.term_en)}</span>`).join("")}</div>`;
     }).join("");
     const t = OB.openTerm >= 0 ? terms[OB.openTerm] : null;
-    const card = t ? `<div class="ob-termcard" style="border-left:4px solid ${catOf(t).color}">
+    // 解释懒加载（方案2）：点击术语时才生成，避免词云请求拖着 70% 的输出 tokens
+    let card;
+    if (!t) {
+      card = `<div class="ob-termcard">👆 点击任意词查看解释，选中后将与主题一起进入检索规划</div>`;
+    } else {
+      const i = OB.openTerm;
+      let explHtml;
+      if (t.explanation) {
+        explHtml = esc(t.explanation);
+      } else if (OB.explFail[i]) {
+        explHtml = `⚠️ 解释生成失败 <button class="ob-btn ghost" style="padding:2px 10px;font-size:11px"
+          onclick="OB.explFail[${i}]=false;obExplain(${i})">重试</button>`;
+      } else {
+        explHtml = `⏳ 解释生成中…（首次点击需 2~4 秒，之后缓存秒回）`;
+        setTimeout(() => obExplain(i), 0);
+      }
+      card = `<div class="ob-termcard" style="border-left:4px solid ${catOf(t).color}">
         <b>${esc(t.term_zh)} · ${esc(t.term_en)}</b>
         <span style="color:${catOf(t).color}">［${(catOf(t).label || "术语").split(" · ")[0]} · 相关度 ${t.weight}/10］</span><br>
-        ${esc(t.explanation)}<br>
+        ${explHtml}<br>
         <button class="ob-btn" style="padding:5px 12px;font-size:12px;margin-top:6px"
           onclick="OB.sel.has(${OB.openTerm})?OB.sel.delete(${OB.openTerm}):OB.sel.add(${OB.openTerm});obRender()">
-          ${OB.sel.has(OB.openTerm) ? "✓ 已加入检索词（点击移除）" : "＋ 加入检索词"}</button></div>`
-      : `<div class="ob-termcard">👆 点击任意词查看解释，选中后将与主题一起进入检索规划</div>`;
+          ${OB.sel.has(OB.openTerm) ? "✓ 已加入检索词（点击移除）" : "＋ 加入检索词"}</button></div>`;
+    }
     const chips = [...OB.sel].map(i => `<span class="ob-chip">${esc(terms[i].term_zh)}</span>`).join("");
     const legend = Object.keys(OB_CAT).map(c =>
       `<span><i style="background:${OB_CAT[c].color}"></i>${OB_CAT[c].label.split(" · ")[0]}</span>`).join("");
@@ -1009,6 +1096,8 @@ async function obGenerate() {
   OB.topic = $("#ob-topic").value.trim()
     .replace(/[（(]重点关注[:：].*?[）)]/g, "").trim();
   if (!OB.topic) { OB.error = "请先输入研究主题"; obRender(); return; }
+  const key = obPfKey();
+  const prefetched = OB.pfCache[key];            // 方案1：预热已就绪/进行中 → 直接复用
   OB.loading = true; OB.error = ""; OB.t0 = Date.now();
   OB.ctl = new AbortController();
   // 计时器：让用户看到"真的在动"，不再像卡死（2026-11-22修复）
@@ -1019,19 +1108,45 @@ async function obGenerate() {
   }, 1000);
   obRender();
   try {
-    OB.glossary = await api("/api/glossary", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic: OB.topic, identity: OB.identity, stage: OB.stage }),
-      timeoutMs: 90000, signal: OB.ctl.signal
-    });
+    if (prefetched) {
+      OB.glossary = await prefetched;            // 预热失败时返回 null → 走下方错误分支
+      if (!OB.glossary) throw new Error("预热生成未完成，请重新点击生成");
+    } else {
+      OB.glossary = await api("/api/glossary", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: OB.topic, identity: OB.identity, stage: OB.stage }),
+        timeoutMs: 90000, signal: OB.ctl.signal
+      });
+    }
+    OB.pfState[key] = "ready";
     OB.step = 2; OB.openTerm = -1;
   } catch (e) {
     OB.error = e.name === "AbortError" ? "已取消生成"
              : (e.message || "词云生成失败");
+    if (prefetched) delete OB.pfCache[key];      // 预热结果失败 → 清缓存以便重试
   }
   clearInterval(OB.tick); OB.loading = false; obRender();
 }
 function obCancelGen() { if (OB.ctl) OB.ctl.abort(); }
+/* ---- 术语解释懒加载（方案2）：单术语按需生成，带缓存重复点击秒回 ---- */
+async function obExplain(i) {
+  const t = OB.glossary && OB.glossary.terms[i];
+  if (!t || t.explanation || OB.explBusy[i]) return;
+  OB.explBusy[i] = true;
+  try {
+    const r = await api("/api/term-explain", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic: OB.topic, identity: OB.identity,
+        term_zh: t.term_zh, term_en: t.term_en, category: t.category }),
+      timeoutMs: 30000
+    });
+    t.explanation = r.explanation || "";
+  } catch (e) {
+    OB.explFail[i] = true;                       // 失败显示重试按钮，不自动循环重试
+  }
+  OB.explBusy[i] = false;
+  obRender();
+}
 function obStartRun() {
   const names = [...OB.sel].map(i => OB.glossary.terms[i].term_zh);
   // 保存中英对照术语（中转页据此做论文关键词命中分析）
@@ -1208,7 +1323,7 @@ function brShowPapers() {
           ${p.claims_n ? `· 已提取 ${p.claims_n} 条声明` : ""}</div></div>
         ${p.score ? `<span class="br-score" title="关键词命中得分：标题 3 分/个，摘要 1 分/个">命中 ${p.score} 分</span>` : ""}</div>
       ${hits ? `<div class="br-hits" style="max-width:100%;justify-content:flex-start;margin:7px 0 0">${hits}</div>` : ""}
-      ${p.abstract ? `<details class="br-abs"><summary>▸ 摘要（前 180 字）</summary>${esc(p.abstract)}…</details>` : ""}
+      ${p.abstract ? `<details class="br-abs"><summary>▸ 摘要（${esc(p.abstract_label || "前 180 字")}）</summary>${esc(p.abstract)}${p.abstract_truncated === false ? "" : "…"}</details>` : ""}
     </div>`;
   }).join("");
   el.classList.remove("hidden");
@@ -1516,6 +1631,45 @@ const VC_META = {
   error:         { label: "⚠️ 核验失败",   color: "var(--muted)", bg: "var(--bg)" }
 };
 
+/* ---- 通用判定卡片骨架：P0-2 文本证据 / P1-2 统计证据共用 ----
+ * spec: { color, bg, badge, meta:[{cls,html}], claim, blocks:[html], evidence:html }
+ * 只复用版式与导出能力，不复用判定枚举——各业务自己定义 badge 语义
+ * （P0-2 是"真/假"，P1-2 是"红海/蓝海/空白"，硬塞同一套四桶会语义错位） */
+function verdictCard(s) {
+  const meta = (s.meta || []).filter(Boolean)
+    .map(m => `<span class="${m.cls}">${m.html}</span>`).join("\n      ");
+  return `<div class="vcard" style="border-left-color:${s.color}">
+    <div class="vhead">
+      <span class="vbadge" style="background:${s.bg};color:${s.color}">${s.badge}</span>
+      ${meta}</div>
+    <div class="vclaim">${s.claim}</div>
+    ${(s.blocks || []).filter(Boolean).join("\n    ")}
+    ${s.evidence || ""}</div>`;
+}
+
+/* 统计证据槽（P1-2 研究空白用）：检索式 + 计数表 + 年度分布，替代 PDF 截图。
+ * spec: { formula, nA, nB, nAB, years:{2024:3,...}, note } */
+function statEvidenceHtml(spec) {
+  const years = spec.years || {};
+  const keys = Object.keys(years).map(Number).sort((a, b) => a - b);
+  const max = Math.max(1, ...keys.map(k => years[k]));
+  const bars = keys.map(k => {
+    const h = Math.round(years[k] / max * 34);
+    return `<span class="vst-bar" title="${k}: ${years[k]} 篇"><i style="height:${h}px"></i><em>${String(k).slice(2)}</em></span>`;
+  }).join("");
+  const rows = [
+    ["领域 A 独立命中", spec.nA],
+    ["领域 B 独立命中", spec.nB],
+    ["A × B 交叉命中", spec.nAB],
+  ].map(([k, v]) => `<tr><td>${esc(k)}</td><td><b>${v == null ? "—" : v}</b></td></tr>`).join("");
+  return `<div class="vstat">
+    <div class="vlvl"><b>统计证据</b>（OpenAlex 标题+摘要检索，口径固定可复现）</div>
+    ${spec.formula ? `<div class="vquote"><code>${esc(spec.formula)}</code></div>` : ""}
+    <table class="vst-tab">${rows}</table>
+    ${bars ? `<div class="vst-spark">${bars}</div><div class="vst-cap">年度分布（两位数年份）</div>` : ""}
+    ${spec.note ? `<div class="vst-cap">${esc(spec.note)}</div>` : ""}</div>`;
+}
+
 function vcCardHtml(v, paperTitle, quotes) {
   const b = vcBucket(v), m = VC_META[b];
   const sem = (v.verdict && v.verdict.verdict) || "abstained";
@@ -1532,11 +1686,14 @@ function vcCardHtml(v, paperTitle, quotes) {
   const ev = (CUR.r.evidence || {})[`${v.arxiv_id}#${v.claim_index}`];
   let evHtml;
   if (ev && ev.located && ev.image) {
+    const cap = `📎 ${ev.pdf || v.arxiv_id} 第${(ev.page ?? 0) + 1}页 · 黄色高亮=证据原文 · 匹配级别 ${ev.match_level || "?"}`;
     evHtml = `<div class="vimg-wrap">
       <img src="/api/evidence-img/${encodeURIComponent(ev.image)}${pwq()}"
            alt="PDF高亮页" loading="lazy"
+           data-cap="${esc(cap).replace(/"/g, "&quot;")}"
+           onclick="vcZoom(this)"
            onerror="this.parentNode.innerHTML='<div class=\\'vmiss\\'>⚠️ 证据图片加载失败（服务器重启后 evidence/ 会清空）</div>'">
-      <div class="vimg-cap">📎 ${esc(ev.pdf || v.arxiv_id)} 第${(ev.page ?? 0) + 1}页 · 黄色高亮=证据原文 · 匹配级别 ${esc(ev.match_level || "?")}</div></div>`;
+      <div class="vimg-cap">${esc(cap)} <span class="vimg-zoom-hint">🔍 点击图片放大</span></div></div>`;
   } else if (ev && ev.located) {
     evHtml = `<div class="vmiss">⚠️ 证据图片缺失（服务器重启后 evidence/ 目录会清空）</div>`;
   } else if (ev) {
@@ -1548,20 +1705,35 @@ function vcCardHtml(v, paperTitle, quotes) {
   const qs = (quotes || []).slice(0, 3).map(q =>
     `<div class="vquote"><code>${esc(q.section || "")}</code> ${esc((q.text || "").slice(0, 160))}</div>`).join("");
   const quotesHtml = qs ? `<div class="vlvl"><b>引用原文</b>${qs}</div>` : "";
-  return `<div class="vcard" style="border-left-color:${m.color}">
-    <div class="vhead">
-      <span class="vbadge" style="background:${m.bg};color:${m.color}">${m.label}</span>
-      <span class="veid">${esc(v.arxiv_id)}#${v.claim_index}</span>
-      <span class="vpaper">${esc(paperTitle || "")}</span></div>
-    <div class="vclaim">${esc(v.claim_content || "")}</div>
-    <div class="vlvl"><b>第1级 · 程序化引用对齐</b>：${v.quote_alignment ? "✓ 真实" : "✗ 疑似伪造"}
+  return verdictCard({
+    color: m.color, bg: m.bg, badge: m.label,
+    meta: [
+      { cls: "veid", html: `${esc(v.arxiv_id)}#${v.claim_index}` },
+      { cls: "vpaper", html: esc(paperTitle || "") },
+    ],
+    claim: esc(v.claim_content || ""),
+    blocks: [
+      `<div class="vlvl"><b>第1级 · 程序化引用对齐</b>：${v.quote_alignment ? "✓ 真实" : "✗ 疑似伪造"}
       ${v.aligned_quote_count != null ? ` · ${v.aligned_quote_count}/${v.quote_count ?? ""}条命中` : ""}
-      ${qd ? `<br><span style="font-size:11px">${qd}</span>` : ""}</div>
-    <div class="vlvl"><b>第2级 · LLM语义核验</b>：<code>${esc(sem)}</code> · 置信度 ${((v.verdict && v.verdict.confidence) ?? 0).toFixed(2)}
-      ${v.verdict && v.verdict.reason ? `<br>${esc(v.verdict.reason)}` : ""}</div>
-    ${factsHtml}
-    ${evHtml}
-    ${quotesHtml}</div>`;
+      ${qd ? `<br><span style="font-size:11px">${qd}</span>` : ""}</div>`,
+      `<div class="vlvl"><b>第2级 · LLM语义核验</b>：<code>${esc(sem)}</code> · 置信度 ${((v.verdict && v.verdict.confidence) ?? 0).toFixed(2)}
+      ${v.verdict && v.verdict.reason ? `<br>${esc(v.verdict.reason)}` : ""}</div>`,
+      factsHtml,
+    ],
+    evidence: evHtml + quotesHtml,
+  });
+}
+
+/* 灯箱：全屏查看证据原图，点击任意处/Esc 关闭 */
+function vcZoom(img) {
+  const lb = document.createElement("div");
+  lb.id = "vlightbox";
+  lb.innerHTML = `<div class="vlb-box"><img src="${img.src}" alt="证据原图">
+    <div class="vlb-cap">${img.dataset.cap || ""}<span style="opacity:.6">（点击任意处关闭）</span></div></div>`;
+  lb.onclick = () => lb.remove();
+  const escClose = (e) => { if (e.key === "Escape") { lb.remove(); document.removeEventListener("keydown", escClose); } };
+  document.addEventListener("keydown", escClose);
+  document.body.appendChild(lb);
 }
 
 async function exportVerdictCards() {
@@ -1582,9 +1754,11 @@ async function exportVerdictCards() {
   const topic = (CUR.t && CUR.t.topic) || "";
   const doc = `<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8">
 <title>证据判决书 · ${esc(topic)}</title><style>
-body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;max-width:900px;margin:0 auto;padding:24px;background:#f4f6fb;}
+body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;max-width:1080px;margin:0 auto;padding:24px;background:#f4f6fb;}
 h1{font-size:1.3rem;color:#101828;} .meta{color:#98a2b3;font-size:.85rem;margin-bottom:8px;}
-.vcard{border:1px solid #e4e9f2;border-left:5px solid #047857;border-radius:10px;padding:14px 16px;margin:10px 0;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.05);}
+.vgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;}
+@media(max-width:820px){.vgrid{grid-template-columns:1fr;}}
+.vcard{border:1px solid #e4e9f2;border-left:5px solid #047857;border-radius:10px;padding:14px 16px;margin:0;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.05);}
 .vhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
 .vbadge{font-weight:700;font-size:12px;border-radius:999px;padding:3px 12px;}
 .veid{font-family:monospace;font-size:11.5px;color:#98a2b3;}
@@ -1593,13 +1767,25 @@ h1{font-size:1.3rem;color:#101828;} .meta{color:#98a2b3;font-size:.85rem;margin-
 .vlvl{background:#f4f6fb;border-radius:6px;padding:8px 10px;font-size:12.5px;margin:4px 0;line-height:1.55;color:#475569;}
 .vlvl b{color:#101828;} .vlvl code,.vfact code,.vquote code{font-size:11px;}
 .vimg-cap{font-size:11px;color:#98a2b3;margin-top:4px;}
-.vimg-wrap img{width:100%;border:1px solid #e4e9f2;border-radius:6px;}
+.vimg-zoom-hint{font-size:10.5px;color:#98a2b3;text-align:right;margin-top:2px;}
+.vimg-wrap img{width:100%;height:200px;object-fit:cover;object-position:top center;cursor:zoom-in;}
+#vlightbox{position:fixed;inset:0;z-index:200;background:rgba(10,14,25,.82);display:flex;align-items:center;justify-content:center;padding:28px;cursor:zoom-out;}
+.vlb-box{max-width:min(1100px,92vw);max-height:88vh;display:flex;flex-direction:column;gap:10px;}
+.vlb-box img{max-width:100%;max-height:80vh;object-fit:contain;border-radius:8px;box-shadow:0 18px 60px rgba(0,0,0,.5);background:#fff;}
+.vlb-cap{color:#e5e9f2;font-size:12.5px;text-align:center;text-shadow:0 1px 3px rgba(0,0,0,.6);}
 .vfact,.vquote{font-size:12px;color:#475569;margin:3px 0;line-height:1.5;}
 .vquote{border-left:3px solid #e4e9f2;padding-left:8px;}
 .vmiss{font-size:12px;color:#b45309;background:#fef3c7;border-radius:6px;padding:6px 10px;margin-top:10px;}
 </style></head><body><h1>📋 证据判决书 · ${esc(topic)}</h1>
 <div class="meta">文献综述 Agent 两级防幻觉核验产出 · 生成于 ${new Date().toLocaleString("zh-CN")}</div>
-${clone.innerHTML}</body></html>`;
+${clone.innerHTML}<script>
+function vcZoom(img){
+  var lb=document.createElement("div");lb.id="vlightbox";
+  lb.innerHTML='<div class="vlb-box"><img src="'+img.src+'" alt="证据原图"><div class="vlb-cap">'+(img.getAttribute("data-cap")||"")+'<span style="opacity:.6">（点击任意处关闭）</span></div></div>';
+  lb.onclick=function(){lb.remove();};
+  document.body.appendChild(lb);
+}
+<\/script></body></html>`;
   const url = URL.createObjectURL(new Blob([doc], { type: "text/html" }));
   const a = document.createElement("a");
   a.href = url; a.download = "evidence_cards.html"; a.click();
@@ -1634,7 +1820,7 @@ function renderVerdictCards(revRows) {
       （✅${stat.supported || 0} ❌${stat.hallucination || 0} ⏸️${stat.abstained || 0} ⚠️${stat.error || 0}）</span>
     <button class="act-btn ghost" onclick="exportVerdictCards()">📤 导出判决书HTML</button></div>`;
   html += shown.length
-    ? `<div id="vcards">${shown.map(v =>
+    ? `<div id="vcards" class="vgrid">${shown.map(v =>
         vcCardHtml(v, titleOf[v.arxiv_id], quotesOf[`${v.arxiv_id}#${v.claim_index}`])).join("")}</div>`
     : '<div class="empty">当前筛选条件下没有声明</div>';
   return html;
@@ -1790,7 +1976,7 @@ async function refusalTest() {
       }
     });
     if (final) box.innerHTML =
-      `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      `<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-bottom:10px">
         ${stat2((final.answerable_acc * 100).toFixed(0) + "%", "可答组正确率")}
         ${stat2((final.refusal_acc * 100).toFixed(0) + "%", "拒答组正确率")}</div>` + lines.join("");
   } catch (e) { box.innerHTML = "测试失败: " + esc(e.message); }

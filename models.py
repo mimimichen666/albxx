@@ -389,12 +389,27 @@ class GlossaryTerm(BaseModel):
     term_zh: str
     weight: int = Field(ge=1, le=10)      # 与主题相关度，决定词云字号与排序
     category: Literal["core", "method", "application", "background"]
-    explanation: str
+    # 解释改为懒加载：词云请求不生成（砍掉~70%输出tokens，首屏62s→约20s），
+    # 用户点击术语时由 /api/term-explain 按需生成并回填
+    explanation: str = ""
 
     @field_validator("explanation")
     @classmethod
     def _trim_expl(cls, v: str) -> str:
         return (v or "").strip()[:100]
+
+
+class TermExplain(BaseModel):
+    """单个术语的按需解释（/api/term-explain 的小模型输出）"""
+    explanation: str
+
+    @field_validator("explanation", mode="before")
+    @classmethod
+    def _unwrap_nested(cls, v):
+        # 小 schema 下模型偶尔双重嵌套 {"explanation": {"explanation": "..."}}，逐层解包
+        while isinstance(v, dict) and "explanation" in v:
+            v = v["explanation"]
+        return v
 
 
 class TopicGlossary(BaseModel):

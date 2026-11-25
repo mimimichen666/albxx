@@ -1,0 +1,118 @@
+<meta charset="utf-8"><body style="font-family:sans-serif;background:#f4f6fb;padding:20px">
+   <style>/* ---- P0-2 判决书卡片视图 ---- */
+.view-toggle { display: flex; gap: 0; margin: 6px 0 12px; border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden; width: fit-content; }
+.vt-btn { border: none; background: var(--card); color: var(--slate); padding: 7px 16px;
+  font-size: 12.5px; cursor: pointer; font-family: inherit; }
+.vt-btn.on { background: var(--brand-lt); color: var(--brand); font-weight: 600; }
+.vc-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; }
+.vc-toolbar select { border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px;
+  font-size: 12.5px; background: var(--card); color: var(--ink); font-family: inherit; }
+.vc-stats { font-size: 12px; color: var(--muted); margin-left: auto; }
+.vcard { border: 1px solid var(--border); border-left: 5px solid var(--green);
+  border-radius: 10px; padding: 14px 16px; margin: 10px 0; background: var(--card);
+  box-shadow: var(--shadow); }
+.vhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.vbadge { font-weight: 700; font-size: 12px; border-radius: 999px; padding: 3px 12px; }
+.veid { font-family: monospace; font-size: 11.5px; color: var(--muted); }
+.vpaper { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; max-width: 420px; }
+.vclaim { font-size: 13.5px; line-height: 1.6; margin: 6px 0 10px; color: var(--ink); }
+.vlvl { background: var(--bg); border-radius: 6px; padding: 8px 10px; font-size: 12.5px;
+  margin: 4px 0; line-height: 1.55; color: var(--slate); }
+.vlvl b { color: var(--ink); }
+.vlvl code, .vfact code, .vquote code { font-size: 11px; }
+.vimg-cap { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.vimg-wrap img { width: 100%; border: 1px solid var(--border); border-radius: 6px; }
+.vfact, .vquote { font-size: 12px; color: var(--slate); margin: 3px 0; line-height: 1.5; }
+.vquote { border-left: 3px solid var(--border); padding-left: 8px; }
+.vmiss { font-size: 12px; color: var(--amber); background: var(--amber-lt);
+  border-radius: 6px; padding: 6px 10px; margin-top: 10px; }
+/* 卡片栅格：宽屏一行两列，窄屏自动退回单列 */
+.vgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px; align-items: start; }
+.vgrid .vcard { margin: 0; height: 100%; }
+@media (max-width: 1080px) { .vgrid { grid-template-columns: 1fr; } }
+/* 证据缩略图：固定高度裁剪顶部（PDF 首行高亮通常在页首），点击看大图 */
+.vgrid .vimg-wrap img { width: 100%; height: 200px; object-fit: cover;
+  object-position: top center; cursor: zoom-in; transition: filter .15s; }
+.vgrid .vimg-wrap img:hover { filter: brightness(1.05) contrast(1.03); }
+.vimg-zoom-hint { font-size: 10.5px; color: var(--muted); text-align: right; margin-top: 2px; }
+/* 灯箱：点击缩略图后的全屏大图查看 */
+#vlightbox { position: fixed; inset: 0; z-index: 200; background: rgba(10, 14, 25, .82);
+  display: flex; align-items: center; justify-content: center; padding: 28px;
+  cursor: zoom-out; animation: vlb-in .16s ease-out; }
+@keyframes vlb-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { #vlightbox { animation: none; } }
+.vlb-box { max-width: min(1100px, 92vw); max-height: 88vh; display: flex;
+  flex-direction: column; gap: 10px; }
+.vlb-box img { max-width: 100%; max-height: 80vh; object-fit: contain;
+  border-radius: 8px; box-shadow: 0 18px 60px rgba(0, 0, 0, .5); background: #fff; }
+.vlb-cap { color: #e5e9f2; font-size: 12.5px; text-align: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
+/* 统计证据槽（P1-2 研究空白用：检索式+计数+年趋势，替代 PDF 截图） */
+.vstat { margin-top: 10px; }
+.vst-tab { border-collapse: collapse; font-size: 12px; margin: 6px 0; width: 100%; }
+.vst-tab td { padding: 3px 8px; border-bottom: 1px dashed var(--border); color: var(--slate); }
+.vst-tab td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.vst-spark { display: flex; align-items: flex-end; gap: 6px; height: 50px; margin-top: 8px; }
+.vst-bar { display: flex; flex-direction: column; align-items: center;
+  justify-content: flex-end; flex: 1; height: 100%; }
+.vst-bar i { display: block; width: 70%; min-height: 2px; background: var(--brand);
+  border-radius: 2px 2px 0 0; }
+.vst-bar em { font-size: 10px; color: var(--muted); font-style: normal; margin-top: 2px; }
+.vst-cap { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+</style>
+   <div class="vcard" style="border-left-color:var(--red)">
+    <div class="vhead">
+      <span class="vbadge" style="background:var(--red-lt);color:var(--red)">🔴 红海/新赛道</span>
+      <span class="veid">large language model × industrial control</span>
+      <span class="vpaper">候选 #1</span></div>
+    <div class="vclaim">「large language model × industrial control」交叉方向覆盖度偏低，可作为选题候选。近三年占 99%，已进入爆发期，切入即红海</div>
+    <div class="vlvl"><b>判定依据</b>：近三年占 99%，已进入爆发期，切入即红海</div>
+    <div class="vstat">
+    <div class="vlvl"><b>统计证据</b>（OpenAlex 标题+摘要检索，口径固定可复现）</div>
+    <div class="vquote"><code>title_and_abstract.search:"large language model" "industrial control"</code></div>
+    <table class="vst-tab"><tr><td>领域 A 独立命中</td><td><b>255699</b></td></tr><tr><td>领域 B 独立命中</td><td><b>18094</b></td></tr><tr><td>A × B 交叉命中</td><td><b>151</b></td></tr></table>
+    <div class="vst-spark"><span class="vst-bar" title="2023: 1 篇"><i style="height:0px"></i><em>23</em></span><span class="vst-bar" title="2024: 16 篇"><i style="height:7px"></i><em>24</em></span><span class="vst-bar" title="2025: 50 篇"><i style="height:20px"></i><em>25</em></span><span class="vst-bar" title="2026: 83 篇"><i style="height:34px"></i><em>26</em></span></div><div class="vst-cap">年度分布（两位数年份）</div>
+    <div class="vst-cap">渗透率 0.835%（双向取小）</div></div></div>
+<div class="vcard" style="border-left-color:var(--amber)">
+    <div class="vhead">
+      <span class="vbadge" style="background:var(--amber-lt);color:var(--amber)">🟡 早期蓝海</span>
+      <span class="veid">spiking neural network × wireless communication</span>
+      <span class="vpaper">候选 #1</span></div>
+    <div class="vclaim">「spiking neural network × wireless communication」交叉方向覆盖度偏低，可作为选题候选。总量小但逐年递增，处于早期布局窗口</div>
+    <div class="vlvl"><b>判定依据</b>：总量小但逐年递增，处于早期布局窗口</div>
+    <div class="vstat">
+    <div class="vlvl"><b>统计证据</b>（OpenAlex 标题+摘要检索，口径固定可复现）</div>
+    <div class="vquote"><code>title_and_abstract.search:"spiking neural network" "wireless communication"</code></div>
+    <table class="vst-tab"><tr><td>领域 A 独立命中</td><td><b>15469</b></td></tr><tr><td>领域 B 独立命中</td><td><b>126406</b></td></tr><tr><td>A × B 交叉命中</td><td><b>36</b></td></tr></table>
+    <div class="vst-spark"><span class="vst-bar" title="2023: 1 篇"><i style="height:3px"></i><em>23</em></span><span class="vst-bar" title="2024: 7 篇"><i style="height:20px"></i><em>24</em></span><span class="vst-bar" title="2025: 12 篇"><i style="height:34px"></i><em>25</em></span><span class="vst-bar" title="2026: 7 篇"><i style="height:20px"></i><em>26</em></span></div><div class="vst-cap">年度分布（两位数年份）</div>
+    <div class="vst-cap">渗透率 0.233%（双向取小）</div></div></div>
+<div class="vcard" style="border-left-color:var(--muted)">
+    <div class="vhead">
+      <span class="vbadge" style="background:var(--bg);color:var(--muted)">⚫ 伪空白</span>
+      <span class="veid">federated learning × deep sea observatory</span>
+      <span class="vpaper">候选 #1</span></div>
+    <div class="vclaim">「federated learning × deep sea observatory」交叉方向覆盖度偏低，可作为选题候选。B 域仅 174 篇，零命中来自领域过窄而非无人研究</div>
+    <div class="vlvl"><b>判定依据</b>：B 域仅 174 篇，零命中来自领域过窄而非无人研究</div>
+    <div class="vstat">
+    <div class="vlvl"><b>统计证据</b>（OpenAlex 标题+摘要检索，口径固定可复现）</div>
+    <div class="vquote"><code>title_and_abstract.search:"federated learning" "deep sea observatory"</code></div>
+    <table class="vst-tab"><tr><td>领域 A 独立命中</td><td><b>62022</b></td></tr><tr><td>领域 B 独立命中</td><td><b>174</b></td></tr><tr><td>A × B 交叉命中</td><td><b>0</b></td></tr></table>
+    
+    <div class="vst-cap">渗透率 0.000%（双向取小）</div></div></div>
+<div class="vcard" style="border-left-color:var(--green)">
+    <div class="vhead">
+      <span class="vbadge" style="background:var(--green-lt);color:var(--green)">🟢 空白候选</span>
+      <span class="veid">graph neural network × power system state estimation</span>
+      <span class="vpaper">候选 #1</span></div>
+    <div class="vclaim">「graph neural network × power system state estimation」交叉方向覆盖度偏低，可作为选题候选。稳定小规模且无爆发迹象，存在未覆盖的细化方向</div>
+    <div class="vlvl"><b>判定依据</b>：稳定小规模且无爆发迹象，存在未覆盖的细化方向</div>
+    <div class="vstat">
+    <div class="vlvl"><b>统计证据</b>（OpenAlex 标题+摘要检索，口径固定可复现）</div>
+    <div class="vquote"><code>title_and_abstract.search:"graph neural network" "power system state estimation"</code></div>
+    <table class="vst-tab"><tr><td>领域 A 独立命中</td><td><b>59996</b></td></tr><tr><td>领域 B 独立命中</td><td><b>1579</b></td></tr><tr><td>A × B 交叉命中</td><td><b>19</b></td></tr></table>
+    <div class="vst-spark"><span class="vst-bar" title="2023: 2 篇"><i style="height:14px"></i><em>23</em></span><span class="vst-bar" title="2024: 3 篇"><i style="height:20px"></i><em>24</em></span><span class="vst-bar" title="2025: 3 篇"><i style="height:20px"></i><em>25</em></span><span class="vst-bar" title="2026: 5 篇"><i style="height:34px"></i><em>26</em></span></div><div class="vst-cap">年度分布（两位数年份）</div>
+    <div class="vst-cap">渗透率 1.203%（双向取小）</div></div></div>

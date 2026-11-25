@@ -442,7 +442,7 @@ def chat_json(messages, schema_class, temperature=0.1, model=None,
                 "content": f"你上次的输出不是合法JSON（错误：{e}）。请重新输出，只输出JSON本身。",
             })
 
-    raise ValueError("模型连续3次未能输出合法JSON，请检查Prompt设计")
+    raise ValueError(f"模型连续{parse_rounds}次未能输出合法JSON，请检查Prompt设计")
 
 
 def print_usage():
